@@ -23,9 +23,29 @@ func NewStartCrawlLogic(ctx context.Context, svcCtx *svc.ServiceContext) *StartC
 	}
 }
 
-// 启动爬虫任务
+// StartCrawl 启动爬虫任务
 func (l *StartCrawlLogic) StartCrawl(in *proto.CrawlRequest) (*proto.CrawlResponse, error) {
-	// todo: add your logic here and delete this line
+	// 参数检查
+	if len(in.Keyword) == 0 {
+		return &proto.CrawlResponse{
+			Success: false,
+			Message: "搜索关键词不能为空",
+		}, nil
+	}
 
-	return &proto.CrawlResponse{}, nil
+	if in.PageCount <= 0 {
+		in.PageCount = 1 // 默认至少爬取1页
+	}
+
+	// 提交任务到队列
+	taskID := l.svcCtx.TaskQueue.AddTask(in)
+
+	l.Logger.Infof("启动新爬虫任务: %s, 关键词: %s, 页数: %d",
+		taskID, in.Keyword, in.PageCount)
+
+	return &proto.CrawlResponse{
+		TaskId:  taskID,
+		Success: true,
+		Message: "任务已成功提交",
+	}, nil
 }
