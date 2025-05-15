@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package crawler;
+
+option go_package = "./proto";
+
+// 爬虫服务定义
+service CrawlerService {
+  // 启动爬虫任务
+  rpc StartCrawl(CrawlRequest) returns (CrawlResponse);
+
+  // 获取爬虫任务状态
+  rpc GetCrawlStatus(StatusRequest) returns (StatusResponse);
+
+  // 获取已爬取的数据
+  rpc GetCrawledData(DataRequest) returns (DataResponse);
+}
+
+// 爬虫请求参数
+message CrawlRequest {
+  string keyword = 1;       // 搜索关键词，例如"南昌"
+  int32 page_count = 2;     // 爬取页数
+  bool include_comments = 3; // 是否包含评论
+  int32 min_likes = 4;      // 最少点赞数筛选
+  string category = 5;      // 类别筛选（可选）
+}
+
+// 爬虫响应
+message CrawlResponse {
+  string task_id = 1;       // 任务ID，用于后续查询状态
+  bool success = 2;         // 任务是否成功启动
+  string message = 3;       // 相关信息或错误消息
+}
+
+// 状态请求
+message StatusRequest {
+  string task_id = 1;       // 任务ID
+}
+
+// 状态响应
+message StatusResponse {
+  enum Status {
+    PENDING = 0; //等待
+    RUNNING = 1; //运行中
+    COMPLETED = 2;//完成
+    FAILED = 3;//失败
+  }
+  Status status = 1;         // 任务状态
+  float progress = 2;        // 进度百分比（0-100）
+  int32 items_collected = 3; // 已收集的项目数
+  string message = 4;        // 状态描述或错误消息
+}
+
+// 数据请求
+message DataRequest {
+  string task_id = 1;        // 任务ID
+  int32 offset = 2;          // 分页偏移量
+  int32 limit = 3;           // 单次获取数量限制
+}
+
+// 数据响应
+message DataResponse {
+  repeated PostItem items = 1; // 爬取的帖子列表
+  int32 total_count = 2;       // 总数量
+  bool has_more = 3;           // 是否有更多数据
+}
+
+// 帖子数据结构
+message PostItem {
+  string post_id = 1;          // 帖子ID
+  string title = 2;            // 标题
+  string content = 3;          // 内容
+  string author = 4;           // 作者
+  int32 likes = 5;             // 点赞数
+  int64 publish_time = 6;      // 发布时间戳
+  repeated string images = 7;  // 图片URL列表
+  repeated Comment comments = 8; // 评论列表
+  repeated string tags = 9;    // 标签列表
+  float rating = 10;           // 评分（如果有）
+  string location = 11;        // 位置信息
+}
+
+// 评论数据结构
+message Comment {
+  string comment_id = 1;       // 评论ID
+  string content = 2;          // 评论内容
+  string author = 3;           // 评论作者
+  int32 likes = 4;             // 评论点赞数
+  int64 comment_time = 5;      // 评论时间戳
+}
