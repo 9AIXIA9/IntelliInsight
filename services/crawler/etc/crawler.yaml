@@ -1,0 +1,11 @@
+Name: crawler.rpc
+ListenOn: ${CRAWLER_LISTEN_HOST}:${CRAWLER_LISTEN_PORT}
+#Etcd:
+#  Hosts:
+#  - 127.0.0.1:2379
+#  Key: crawler.rpc
+
+
+Consul:
+  Host: ${CONSUL_HOST}:${CONSUL_PORT}
+  Key: ${CONSUL_SERVICE_KEY}

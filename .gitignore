@@ -21,8 +21,6 @@ ehthumbs.db
 
 # --- Go语言 ---
 # 二进制文件和编译产物
-/go-services/bin/
-/go-services/pkg/
 *.exe
 *.test
 *.out

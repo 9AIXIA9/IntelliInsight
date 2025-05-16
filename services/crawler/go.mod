@@ -3,6 +3,7 @@ module crawler
 go 1.24.1
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/zeromicro/go-zero v1.8.3
 	github.com/zeromicro/zero-contrib/zrpc/registry/consul v0.0.0-20231030135404-af9ae855016f
 	go.uber.org/mock v0.5.2

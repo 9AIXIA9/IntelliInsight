@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/zeromicro/go-zero/core/threading"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"crawler/proto"
@@ -277,14 +276,10 @@ func (tq *taskQueue) AddTaskResult(taskID string, items []*proto.PostItem) error
 	return nil
 }
 
-var (
-	globalID atomic.Uint64
-)
-
 // generateTaskID 生成唯一任务ID
 func generateTaskID() string {
 	//todo return fmt.Sprintf("%d", time.Now().UnixMicro())
-	return fmt.Sprintf("%d", globalID.Add(1))
+	return fmt.Sprintf("%d", time.Now().UnixMicro())
 }
 
 // getStatusMessage 获取状态描述信息
