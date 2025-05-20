@@ -19,9 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CrawlerService_StartCrawl_FullMethodName     = "/crawler.CrawlerService/StartCrawl"
-	CrawlerService_GetCrawlStatus_FullMethodName = "/crawler.CrawlerService/GetCrawlStatus"
-	CrawlerService_GetCrawledData_FullMethodName = "/crawler.CrawlerService/GetCrawledData"
+	CrawlerService_StartCrawl_FullMethodName = "/crawler.CrawlerService/StartCrawl"
 )
 
 // CrawlerServiceClient is the client API for CrawlerService service.
@@ -32,10 +30,6 @@ const (
 type CrawlerServiceClient interface {
 	// 启动爬虫任务
 	StartCrawl(ctx context.Context, in *CrawlRequest, opts ...grpc.CallOption) (*CrawlResponse, error)
-	// 获取爬虫任务状态
-	GetCrawlStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
-	// 获取已爬取的数据
-	GetCrawledData(ctx context.Context, in *DataRequest, opts ...grpc.CallOption) (*DataResponse, error)
 }
 
 type crawlerServiceClient struct {
@@ -56,26 +50,6 @@ func (c *crawlerServiceClient) StartCrawl(ctx context.Context, in *CrawlRequest,
 	return out, nil
 }
 
-func (c *crawlerServiceClient) GetCrawlStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StatusResponse)
-	err := c.cc.Invoke(ctx, CrawlerService_GetCrawlStatus_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *crawlerServiceClient) GetCrawledData(ctx context.Context, in *DataRequest, opts ...grpc.CallOption) (*DataResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DataResponse)
-	err := c.cc.Invoke(ctx, CrawlerService_GetCrawledData_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // CrawlerServiceServer is the server API for CrawlerService service.
 // All implementations must embed UnimplementedCrawlerServiceServer
 // for forward compatibility.
@@ -84,10 +58,6 @@ func (c *crawlerServiceClient) GetCrawledData(ctx context.Context, in *DataReque
 type CrawlerServiceServer interface {
 	// 启动爬虫任务
 	StartCrawl(context.Context, *CrawlRequest) (*CrawlResponse, error)
-	// 获取爬虫任务状态
-	GetCrawlStatus(context.Context, *StatusRequest) (*StatusResponse, error)
-	// 获取已爬取的数据
-	GetCrawledData(context.Context, *DataRequest) (*DataResponse, error)
 	mustEmbedUnimplementedCrawlerServiceServer()
 }
 
@@ -100,12 +70,6 @@ type UnimplementedCrawlerServiceServer struct{}
 
 func (UnimplementedCrawlerServiceServer) StartCrawl(context.Context, *CrawlRequest) (*CrawlResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartCrawl not implemented")
-}
-func (UnimplementedCrawlerServiceServer) GetCrawlStatus(context.Context, *StatusRequest) (*StatusResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetCrawlStatus not implemented")
-}
-func (UnimplementedCrawlerServiceServer) GetCrawledData(context.Context, *DataRequest) (*DataResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetCrawledData not implemented")
 }
 func (UnimplementedCrawlerServiceServer) mustEmbedUnimplementedCrawlerServiceServer() {}
 func (UnimplementedCrawlerServiceServer) testEmbeddedByValue()                        {}
@@ -146,42 +110,6 @@ func _CrawlerService_StartCrawl_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _CrawlerService_GetCrawlStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StatusRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CrawlerServiceServer).GetCrawlStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CrawlerService_GetCrawlStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CrawlerServiceServer).GetCrawlStatus(ctx, req.(*StatusRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _CrawlerService_GetCrawledData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DataRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CrawlerServiceServer).GetCrawledData(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: CrawlerService_GetCrawledData_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CrawlerServiceServer).GetCrawledData(ctx, req.(*DataRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // CrawlerService_ServiceDesc is the grpc.ServiceDesc for CrawlerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -192,14 +120,6 @@ var CrawlerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StartCrawl",
 			Handler:    _CrawlerService_StartCrawl_Handler,
-		},
-		{
-			MethodName: "GetCrawlStatus",
-			Handler:    _CrawlerService_GetCrawlStatus_Handler,
-		},
-		{
-			MethodName: "GetCrawledData",
-			Handler:    _CrawlerService_GetCrawledData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -33,15 +33,22 @@ func (l *StartCrawlLogic) StartCrawl(in *proto.CrawlRequest) (*proto.CrawlRespon
 		}, nil
 	}
 
-	if in.PageCount <= 0 {
-		in.PageCount = 1 // 默认至少爬取1页
+	if in.PostCount <= 0 {
+		in.PostCount = 1 // 默认至少爬取1页
 	}
 
 	// 提交任务到队列
-	taskID := l.svcCtx.TaskQueue.AddTask(in)
+	taskID, err := l.svcCtx.CrawlerTaskQueue.AddTask(in)
+	if err != nil {
+		return &proto.CrawlResponse{
+			TaskId:  taskID,
+			Success: false,
+			Message: err.Error(),
+		}, err
+	}
 
 	l.Logger.Infof("启动新爬虫任务: %s, 关键词: %s, 页数: %d",
-		taskID, in.Keyword, in.PageCount)
+		taskID, in.Keyword, in.PostCount)
 
 	return &proto.CrawlResponse{
 		TaskId:  taskID,

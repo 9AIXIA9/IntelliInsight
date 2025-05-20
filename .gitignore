@@ -75,7 +75,7 @@ htmlcov/
 /tmp/
 /output/
 *.log
-*.log.*
+*.logx.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

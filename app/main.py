@@ -1,13 +1,14 @@
 import os
-from typing import Optional
 
 import consul
-import grpc
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
+
+# 导入我们的gRPC客户端
+from grpc_client.crawler_client import CrawlerClient, CrawlerServiceConfig
 
 # 加载环境变量
 load_dotenv()
@@ -28,29 +29,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 导入生成的gRPC代码
-import crawler_pb2
-import crawler_pb2_grpc
-
-
 # 数据模型
 class CrawlRequest(BaseModel):
     keyword: str
-    page_count: int = 1
+    post_count: int = 1
     include_comments: bool = False
     min_likes: int = 0
-    category: Optional[str] = None
+    comments_per_post: int = 10
+    replies_per_comment: int = 5
+    include_images: bool = True
 
 
 # 全局变量
 mongodb_client = None
-crawler_stub = None
+crawler_client = None
 consul_client = None
 
 
 @app.on_event("startup")
 async def startup_db_client():
-    global mongodb_client, crawler_stub, consul_client
+    global mongodb_client, crawler_client, consul_client
 
     # 连接MongoDB
     mongodb_uri = os.getenv("MONGODB_URI")
@@ -59,123 +57,62 @@ async def startup_db_client():
     app.mongodb = mongodb_client[mongodb_db]
 
     # 连接Consul并发现爬虫服务
-    consul_host = os.getenv("CONSUL_HOST")
-    consul_port = int(os.getenv("CONSUL_PORT"))
-    consul_client = consul.Consul(host=consul_host, port=consul_port)
+    consul_host = os.getenv("CONSUL_HOST", "localhost")
+    consul_port = int(os.getenv("CONSUL_PORT", "8500"))
 
-    # 从Consul获取爬虫服务地址
-    services = consul_client.catalog.service("consul-crawler.rpc")[1]
-    if services:
-        service = services[0]
-        crawler_addr = f"{service['ServiceAddress']}:{service['ServicePort']}"
-    else:
-        # 开发环境默认地址
-        crawler_addr = "localhost:50051"
+    try:
+        consul_client = consul.Consul(host=consul_host, port=consul_port)
 
-    # 创建gRPC通道和存根
-    channel = grpc.insecure_channel(crawler_addr)
-    crawler_stub = crawler_pb2_grpc.CrawlerServiceStub(channel)
+        # 从Consul获取爬虫服务地址
+        services = consul_client.catalog.service("consul-crawler.rpc")[1]
+        if services:
+            service = services[0]
+            crawler_host = service['ServiceAddress']
+            crawler_port = service['ServicePort']
+        else:
+            # 开发环境默认地址
+            crawler_host = os.getenv("CRAWLER_HOST", "localhost")
+            crawler_port = int(os.getenv("CRAWLER_PORT", "50051"))
+    except Exception as e:
+        # 如果Consul连接失败，使用默认配置
+        crawler_host = os.getenv("CRAWLER_HOST", "localhost")
+        crawler_port = int(os.getenv("CRAWLER_PORT", "50051"))
+
+    # 创建爬虫客户端
+    config = CrawlerServiceConfig(
+        host=crawler_host,
+        port=crawler_port,
+        timeout=int(os.getenv("GRPC_TIMEOUT", "30")),
+        max_retries=int(os.getenv("GRPC_MAX_RETRIES", "3"))
+    )
+    crawler_client = CrawlerClient(config)
 
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    global mongodb_client
+    global mongodb_client, crawler_client
     if mongodb_client:
         mongodb_client.close()
+    if crawler_client:
+        crawler_client.close()
 
 
 # API路由
-
 @app.post("/api/crawl", response_model=dict)
 async def start_crawl(request: CrawlRequest):
     """启动新的爬虫任务"""
-    grpc_request = crawler_pb2.CrawlRequest(
-        keyword=request.keyword,
-        page_count=request.page_count,
-        include_comments=request.include_comments,
-        min_likes=request.min_likes,
-        category=request.category or ""
-    )
-
     try:
-        response = crawler_stub.StartCrawl(grpc_request)
-        return {
-            "task_id": response.task_id,
-            "success": response.success,
-            "message": response.message
-        }
-    except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=f"gRPC调用失败: {str(e)}")
-
-
-@app.get("/api/status/{task_id}")
-async def get_status(task_id: str):
-    """获取爬虫任务状态"""
-    try:
-        response = crawler_stub.GetCrawlStatus(
-            crawler_pb2.StatusRequest(task_id=task_id)
+        return crawler_client.start_crawl(
+            keyword=request.keyword,
+            post_count=request.post_count,
+            include_comments=request.include_comments,
+            min_likes=request.min_likes,
+            comments_per_post=request.comments_per_post,
+            replies_per_comment=request.replies_per_comment,
+            include_images=request.include_images
         )
-        return {
-            "status": crawler_pb2.StatusResponse.Status.Name(response.status),
-            "progress": response.progress,
-            "items_collected": response.items_collected,
-            "message": response.message
-        }
-    except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=f"gRPC调用失败: {str(e)}")
-
-
-@app.get("/api/data/{task_id}")
-async def get_crawl_data(
-        task_id: str,
-        offset: int = Query(0, ge=0),
-        limit: int = Query(10, ge=1, le=100)
-):
-    """获取爬取的数据"""
-    try:
-        response = crawler_stub.GetCrawledData(
-            crawler_pb2.DataRequest(
-                task_id=task_id,
-                offset=offset,
-                limit=limit
-            )
-        )
-
-        # 转换PostItem对象为字典
-        items = []
-        for item in response.items:
-            item_dict = {
-                "post_id": item.post_id,
-                "title": item.title,
-                "content": item.content,
-                "author": item.author,
-                "likes": item.likes,
-                "publish_time": item.publish_time,
-                "images": list(item.images),
-                "tags": list(item.tags),
-                "rating": item.rating,
-                "location": item.location,
-                "comments": []
-            }
-
-            for comment in item.comments:
-                item_dict["comments"].append({
-                    "comment_id": comment.comment_id,
-                    "content": comment.content,
-                    "author": comment.author,
-                    "likes": comment.likes,
-                    "comment_time": comment.comment_time
-                })
-
-            items.append(item_dict)
-
-        return {
-            "items": items,
-            "total_count": response.total_count,
-            "has_more": response.has_more
-        }
-    except grpc.RpcError as e:
-        raise HTTPException(status_code=500, detail=f"gRPC调用失败: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"爬虫服务调用失败: {str(e)}")
 
 
 if __name__ == "__main__":

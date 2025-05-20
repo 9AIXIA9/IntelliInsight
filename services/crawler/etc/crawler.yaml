@@ -1,11 +1,25 @@
 Name: crawler.rpc
-ListenOn: ${CRAWLER_LISTEN_HOST}:${CRAWLER_LISTEN_PORT}
-#Etcd:
-#  Hosts:
-#  - 127.0.0.1:2379
-#  Key: crawler.rpc
-
+ListenOn: ${SERVER_LISTEN_ON:0.0.0.0:8999}
 
 Consul:
-  Host: ${CONSUL_HOST}:${CONSUL_PORT}
+  Host: ${CONSUL_HOST:127.0.0.1:8500}
   Key: ${CONSUL_SERVICE_KEY}
+
+MongoDB:
+  URI: ${MONGODB_URI}
+  Database: ${MONGODB_DATABASE:crawler_db}
+  PostCollection: ${MONGODB_POST_COLLECTION:crawler_posts}
+
+TaskQueue:
+  WorkQueueSize: ${TASK_QUEUE_WORK_QUEUE_SIZE:100}
+  MaxWorkers: ${TASK_QUEUE_MAX_WORKERS:2}
+
+Resource:
+  DataBasePath: ${RESOURCE_DATABASE_PATH}
+  IPs: [ ]
+  FingerPrints: [ ]
+  ResourceOption:
+    BrowserPath: ${RESOURCE_BROWSER_PATH}
+    Headless: ${RESOURCE_HEADLESS:false}
+    MaxSize: ${RESOURCE_MAX_SIZE:5}
+    InitialSize: ${RESOURCE_INITIAL_SIZE:2}

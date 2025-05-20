@@ -28,15 +28,3 @@ func (s *CrawlerServiceServer) StartCrawl(ctx context.Context, in *proto.CrawlRe
 	l := logic.NewStartCrawlLogic(ctx, s.svcCtx)
 	return l.StartCrawl(in)
 }
-
-// 获取爬虫任务状态
-func (s *CrawlerServiceServer) GetCrawlStatus(ctx context.Context, in *proto.StatusRequest) (*proto.StatusResponse, error) {
-	l := logic.NewGetCrawlStatusLogic(ctx, s.svcCtx)
-	return l.GetCrawlStatus(in)
-}
-
-// 获取已爬取的数据
-func (s *CrawlerServiceServer) GetCrawledData(ctx context.Context, in *proto.DataRequest) (*proto.DataResponse, error) {
-	l := logic.NewGetCrawledDataLogic(ctx, s.svcCtx)
-	return l.GetCrawledData(in)
-}

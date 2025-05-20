@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/zeromicro/go-zero/core/logx"
 
 	"crawler/internal/config"
 	"crawler/internal/server"
@@ -39,10 +40,13 @@ func main() {
 
 	// 添加Consul服务注册
 	if err := consul.RegisterService(c.ListenOn, c.Consul); err != nil {
-		panic(fmt.Sprintf("注册服务到Consul失败: %v", err))
+		logx.Severe(fmt.Sprintf("注册服务到Consul失败: %v", err))
 	}
 
-	defer s.Stop()
+	defer func() {
+		s.Stop()
+		ctx.CrawlerTaskQueue.Stop()
+	}()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)
 	s.Start()

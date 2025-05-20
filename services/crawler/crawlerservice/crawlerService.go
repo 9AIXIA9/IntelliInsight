@@ -14,22 +14,14 @@ import (
 )
 
 type (
-	Comment        = proto.Comment
-	CrawlRequest   = proto.CrawlRequest
-	CrawlResponse  = proto.CrawlResponse
-	DataRequest    = proto.DataRequest
-	DataResponse   = proto.DataResponse
-	PostItem       = proto.PostItem
-	StatusRequest  = proto.StatusRequest
-	StatusResponse = proto.StatusResponse
+	Comment       = proto.Comment
+	CrawlRequest  = proto.CrawlRequest
+	CrawlResponse = proto.CrawlResponse
+	PostItem      = proto.PostItem
 
 	CrawlerService interface {
 		// 启动爬虫任务
 		StartCrawl(ctx context.Context, in *CrawlRequest, opts ...grpc.CallOption) (*CrawlResponse, error)
-		// 获取爬虫任务状态
-		GetCrawlStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
-		// 获取已爬取的数据
-		GetCrawledData(ctx context.Context, in *DataRequest, opts ...grpc.CallOption) (*DataResponse, error)
 	}
 
 	defaultCrawlerService struct {
@@ -47,16 +39,4 @@ func NewCrawlerService(cli zrpc.Client) CrawlerService {
 func (m *defaultCrawlerService) StartCrawl(ctx context.Context, in *CrawlRequest, opts ...grpc.CallOption) (*CrawlResponse, error) {
 	client := proto.NewCrawlerServiceClient(m.cli.Conn())
 	return client.StartCrawl(ctx, in, opts...)
-}
-
-// 获取爬虫任务状态
-func (m *defaultCrawlerService) GetCrawlStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
-	client := proto.NewCrawlerServiceClient(m.cli.Conn())
-	return client.GetCrawlStatus(ctx, in, opts...)
-}
-
-// 获取已爬取的数据
-func (m *defaultCrawlerService) GetCrawledData(ctx context.Context, in *DataRequest, opts ...grpc.CallOption) (*DataResponse, error) {
-	client := proto.NewCrawlerServiceClient(m.cli.Conn())
-	return client.GetCrawledData(ctx, in, opts...)
 }
