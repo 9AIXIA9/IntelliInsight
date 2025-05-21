@@ -1,8 +1,10 @@
 package config
 
 import (
+	"crawler/internal/domain"
 	"github.com/zeromicro/go-zero/zrpc"
 	"github.com/zeromicro/zero-contrib/zrpc/registry/consul"
+	"time"
 )
 
 type Config struct {
@@ -33,8 +35,10 @@ type Resource struct {
 	IPs          []string //IPs
 	FingerPrints []string //指纹
 
-	BrowserPath string //浏览器路径
-	Headless    bool   //是否开启可视化 默认关闭
-	MaxPoolSize int    // 最大资源实例数 默认 5
-	InitialSize int    // 初始资源实例数 默认 2
+	BrowserPath           string                       //浏览器路径
+	MaxPoolSize           int                          // 最大资源实例数
+	InitialSize           int                          // 初始资源实例数
+	Headless              bool                         //是否开启可视化
+	HealthCheckInterval   time.Duration                //健康检查间隔
+	LoadBalancingStrategy domain.LoadBalancingStrategy //负载均衡策略
 }

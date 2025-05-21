@@ -20,7 +20,7 @@ type Task struct {
 	PostsCollected int32
 	StartTime      time.Time
 	EndTime        time.Time
-	Status         TaskStatus
+	Status         string
 	Err            error
 }
 
@@ -28,8 +28,23 @@ type Task struct {
 type TaskStatus int
 
 const (
-	TaskStatusCompleted TaskStatus = iota
-	TaskStatusFailed
-	TaskStatusRunning
-	TaskStatusPending
+	StatusCompleted TaskStatus = iota
+	StatusFailed
+	StatusRunning
+	StatusPending
 )
+
+func (s TaskStatus) String() string {
+	switch s {
+	case StatusCompleted:
+		return "已完成"
+	case StatusFailed:
+		return "失败"
+	case StatusRunning:
+		return "运行中"
+	case StatusPending:
+		return "等待中"
+	default:
+		return "未知状态"
+	}
+}

@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // ResourceUnit 表示一个完整的资源单元
 type ResourceUnit interface {
@@ -8,7 +11,9 @@ type ResourceUnit interface {
 	IP() string
 	Fingerprint() string
 	DataDir() string
-	Update(dataDir string, ip string, fingerPrint string)
+	Refresh(dataDir string, ip string, fingerPrint string)
+	CheckHealth() bool
+	Close()
 }
 
 // ResourcePool 资源池接口
@@ -16,8 +21,16 @@ type ResourcePool interface {
 	GetResource(ctx context.Context) (ResourceUnit, error)
 	ReleaseResource(ResourceUnit)
 	RefreshResource(ResourceUnit) ResourceUnit
+	AsyncHealthCheck(interval time.Duration)
+	CheckUnitsHealth()
+	LoadBalancingStrategy() LoadBalancingStrategy
+	LoadBalancing() (dataDir string, ip string, fingerPrint string)
 	Close()
 }
 
-// DefaultFingerPrints todo 填补
-var DefaultFingerPrints = []string{"demo"}
+type LoadBalancingStrategy int
+
+const (
+	Random LoadBalancingStrategy = iota
+	Round
+)

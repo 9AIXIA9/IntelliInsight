@@ -3,23 +3,54 @@ package chromedpx
 import (
 	"context"
 	"crawler/internal/domain"
+	"fmt"
 	"github.com/chromedp/chromedp"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io/ioutil"
-	"strings"
 	"sync"
 	"time"
 )
 
 type Browser struct {
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	userAgent  string
-	execPath   string
-	mutex      sync.Mutex // 保护浏览器操作线程安全
+	ctx         context.Context
+	cancelFunc  context.CancelFunc
+	fingerPrint string
+	execPath    string
+	mutex       sync.Mutex // 保护浏览器操作线程安全
 }
 
 func NewBrowser(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) domain.Browser {
+	logx.Infof("初始化浏览器: 数据目录=%s, 代理IP=%s", dataDir, ip)
+
+	opts := getOptions(dataDir, ip, fingerPrint, enableHeadless, browserPath)
+
+	// 创建有超时的上下文
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), opts...)
+
+	// 创建浏览器上下文并保存取消函数
+	ctx, cancel := chromedp.NewContext(allocCtx)
+
+	browser := &Browser{
+		ctx: ctx,
+		cancelFunc: func() {
+			cancel()      // 先取消浏览器上下文
+			allocCancel() // 再取消分配器上下文
+		},
+		fingerPrint: fingerPrint,
+		execPath:    browserPath,
+		mutex:       sync.Mutex{},
+	}
+
+	if err := chromedp.Run(ctx, chromedp.Navigate("about:blank")); err != nil {
+		logx.Errorf("浏览器初始化失败: %v", err)
+		browser.Close()
+		return nil
+	}
+
+	return browser
+}
+
+func getOptions(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) []chromedp.ExecAllocatorOption {
 	// 设置Chrome选项
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
@@ -28,38 +59,25 @@ func NewBrowser(dataDir string, ip string, fingerPrint string, enableHeadless bo
 		chromedp.UserDataDir(dataDir),
 	}
 
-	// 设置代理
-	if ip != "" {
+	// 仅当IP不是localhost或127.0.0.1时才设置代理
+	if ip != "" && ip != "localhost" && ip != "127.0.0.1" {
+		logx.Infof("使用代理: %s", ip)
 		opts = append(opts, chromedp.ProxyServer(ip))
 	}
 
-	// 设置浏览器路径
 	if browserPath != "" {
 		opts = append(opts, chromedp.ExecPath(browserPath))
 	}
 
-	// 设置是否启用无头模式
 	if enableHeadless {
 		opts = append(opts, chromedp.Headless)
 	}
 
-	// 设置用户代理和其他指纹
 	if fingerPrint != "" {
 		opts = append(opts, chromedp.UserAgent(fingerPrint))
 	}
 
-	// 创建新的浏览器实例
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	ctx, _ := chromedp.NewContext(allocCtx)
-
-	browser := &Browser{
-		ctx:        ctx,
-		cancelFunc: cancel,
-		userAgent:  fingerPrint,
-		execPath:   browserPath,
-	}
-
-	return browser
+	return opts
 }
 
 func (b *Browser) Navigate(url string) error {
@@ -104,6 +122,38 @@ func (b *Browser) FindElement(selector string) (domain.Element, error) {
 		selector: selector,
 	}, nil
 }
+func (b *Browser) FindAllElements(selector string) ([]domain.Element, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	// 首先检查元素是否存在并获取元素数量
+	var count int
+	err := chromedp.Run(b.ctx, chromedp.EvaluateAsDevTools(`
+		document.querySelectorAll("`+selector+`").length
+	`, &count))
+
+	if err != nil {
+		return nil, err
+	}
+
+	if count == 0 {
+		return []domain.Element{}, nil
+	}
+
+	// 创建元素列表
+	elements := make([]domain.Element, count)
+	for i := 0; i < count; i++ {
+		// 为每个元素创建选择器 (使用 :nth-child 索引从 1 开始)
+		indexStr := fmt.Sprintf("%d", i+1)
+		indexSelector := selector + ":nth-child(" + indexStr + ")"
+		elements[i] = &Element{
+			browser:  b,
+			selector: indexSelector,
+		}
+	}
+
+	return elements, nil
+}
 
 func (b *Browser) ScrollPage() error {
 	b.mutex.Lock()
@@ -122,14 +172,6 @@ func (b *Browser) ExecuteJS(script string, result interface{}) error {
 	defer b.mutex.Unlock()
 
 	return chromedp.Run(b.ctx, chromedp.Evaluate(script, result))
-}
-
-func (b *Browser) NeedLogin() bool {
-	// 可以根据页面内容或URL判断是否需要登录
-	content := b.GetPageContent()
-	return strings.Contains(content, "登录") ||
-		strings.Contains(content, "login") ||
-		strings.Contains(content, "请登录")
 }
 
 func (b *Browser) Screenshot(path string) error {

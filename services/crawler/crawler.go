@@ -28,7 +28,7 @@ func main() {
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c, conf.UseEnv())
-	ctx := svc.NewServiceContext(c)
+	ctx := svc.NewServiceContext(&c)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		proto.RegisterCrawlerServiceServer(grpcServer, server.NewCrawlerServiceServer(ctx))
@@ -45,7 +45,7 @@ func main() {
 
 	defer func() {
 		s.Stop()
-		ctx.CrawlerTaskQueue.Stop()
+		ctx.TaskQueue.Stop()
 	}()
 
 	fmt.Printf("Starting rpc server at %s...\n", c.ListenOn)

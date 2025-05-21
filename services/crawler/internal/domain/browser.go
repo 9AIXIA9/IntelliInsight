@@ -7,9 +7,9 @@ type Browser interface {
 	Navigate(url string) error
 	GetPageContent() string
 	FindElement(selector string) (Element, error)
+	FindAllElements(selector string) ([]Element, error)
 	ScrollPage() error
 	ExecuteJS(script string, result interface{}) error
-	NeedLogin() bool
 	Screenshot(path string) error
 	Close()
 }

@@ -1,25 +1,27 @@
 Name: crawler.rpc
-ListenOn: ${SERVER_LISTEN_ON:0.0.0.0:8999}
+ListenOn: ${SERVER_LISTEN_ON}
 
 Consul:
-  Host: ${CONSUL_HOST:127.0.0.1:8500}
+  Host: ${CONSUL_HOST}
   Key: ${CONSUL_SERVICE_KEY}
 
 MongoDB:
   URI: ${MONGODB_URI}
-  Database: ${MONGODB_DATABASE:crawler_db}
-  PostCollection: ${MONGODB_POST_COLLECTION:crawler_posts}
+  Database: ${MONGODB_DATABASE}
+  PostCollection: ${MONGODB_POST_COLLECTION}
+  TaskCollection: ${MONGODB_TASK_COLLECTION}
 
 TaskQueue:
-  WorkQueueSize: ${TASK_QUEUE_WORK_QUEUE_SIZE:100}
-  MaxWorkers: ${TASK_QUEUE_MAX_WORKERS:2}
+  WorkQueueSize: ${TASK_QUEUE_WORK_QUEUE_SIZE}
+  MaxWorkers: ${TASK_QUEUE_MAX_WORKERS}
 
 Resource:
-  DataBasePath: ${RESOURCE_DATABASE_PATH}
-  IPs: [ ]
+  DataBasePath: ${RESOURCE_DATA_BASE_PATH}
+  IPs: [ "localhost", "127.0.0.1" ]
   FingerPrints: [ ]
-  ResourceOption:
-    BrowserPath: ${RESOURCE_BROWSER_PATH}
-    Headless: ${RESOURCE_HEADLESS:false}
-    MaxSize: ${RESOURCE_MAX_SIZE:5}
-    InitialSize: ${RESOURCE_INITIAL_SIZE:2}
+  BrowserPath: ${RESOURCE_BROWSER_PATH}
+  Headless: ${RESOURCE_HEADLESS}
+  MaxPoolSize: ${RESOURCE_MAX_SIZE}
+  InitialSize: ${RESOURCE_INITIAL_SIZE}
+  HealthCheckInterval: ${RESOURCE_HEALTH_CHECK_INTERVAL}
+  LoadBalancingStrategy: ${RESOURCE_LOAD_BALANCING_STRATEGY}

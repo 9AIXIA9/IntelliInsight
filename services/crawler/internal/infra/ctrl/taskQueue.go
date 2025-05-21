@@ -1,9 +1,11 @@
-package crawler
+package ctrl
 
 import (
 	"context"
 	"crawler/internal/config"
 	"crawler/internal/domain"
+	"crawler/internal/infra/crawler"
+	"crawler/internal/infra/site"
 	"crawler/internal/infra/utils"
 	"fmt"
 	"sync"
@@ -28,15 +30,15 @@ type TaskQueue struct {
 }
 
 // NewTaskQueue 创建爬虫任务队列
-func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, pool domain.ResourcePool) domain.TaskQueue {
+func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, resourcePool domain.ResourcePool) domain.TaskQueue {
 	if repo == nil {
 		logx.Severef("仓库不能为空")
 	}
 
 	tq := &TaskQueue{
 		repo:         repo,
-		resourcePool: pool,
-		crawler:      NewCrawler(),
+		resourcePool: resourcePool,
+		crawler:      crawler.NewCrawler(),
 		mutex:        sync.RWMutex{},
 		taskChan:     make(chan *domain.Task, conf.WorkQueueSize),
 		workerPool:   make(chan struct{}, conf.MaxWorkers),
@@ -80,6 +82,14 @@ func (tq *TaskQueue) Dispatcher() {
 // ProcessTask 处理单个任务的逻辑
 func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	defer func() {
+		if r := recover(); r != nil {
+			task.Status = domain.StatusFailed.String()
+			task.Err = fmt.Errorf("任务执行出现panic: %v", r)
+			logx.Errorf("任务ID: %s 执行出现panic: %v", task.ID, r)
+		}
+
+		task.EndTime = time.Now()
+
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
@@ -88,15 +98,21 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		}
 	}()
 
-	site := ConvertSite(task.Request.Site)
+	s, err := site.Convert(task.Request.Site)
+	if err != nil {
+		task.Status = domain.StatusFailed.String()
+		task.Err = fmt.Errorf("无法获取资源实例")
+		logx.Error(task.Err)
+		return
+	}
 
 	// 从池获取资源
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	resource, err := tq.resourcePool.GetResource(ctx)
 	if err != nil {
-		task.Status = domain.TaskStatusFailed
+		task.Status = domain.StatusFailed.String()
 		task.Err = fmt.Errorf("无法获取资源实例")
 		logx.Error(task.Err)
 		return
@@ -109,9 +125,9 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	// 搜索关键词，获取帖子链接列表
 	logx.Infof("开始收集到帖子链接")
 
-	links, err := tq.crawler.CollectPostLinks(resource, site, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
+	links, err := tq.crawler.CollectPostLinks(resource.Browser(), s, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
 	if err != nil {
-		task.Status = domain.TaskStatusFailed
+		task.Status = domain.StatusFailed.String()
 		task.Err = fmt.Errorf("收集帖子链接失败：%v", err)
 		logx.Error(task.Err)
 		return
@@ -119,12 +135,12 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 
 	logx.Infof("成功收集到 %d 个帖子链接", len(links))
 
-	posts := make([]*proto.PostItem, len(links))
+	posts := make([]*proto.PostItem, 0, len(links))
 
 	for i, link := range links {
 		logx.Infof("开始爬取第 %d/%d 个帖子: %s", i+1, len(links), link)
 
-		post, err := tq.crawler.CollectPostDetail(resource, site, link, &domain.CollectPostDetailOption{
+		post, err := tq.crawler.CollectPostDetail(resource.Browser(), s, link, &domain.CollectPostDetailOption{
 			IncludeComments:   task.Request.IncludeComments,
 			IncludeImages:     task.Request.IncludeImages,
 			CommentsPerPost:   task.Request.CommentsPerPost,
@@ -152,8 +168,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		logx.Errorf("保存爬取结果到MongoDB失败: %v", err)
 	}
 
-	task.EndTime = time.Now()
-	task.Status = domain.TaskStatusCompleted
+	task.Status = domain.StatusCompleted.String()
 }
 
 // AddTask 【生产者】添加新任务到队列
@@ -163,21 +178,24 @@ func (tq *TaskQueue) AddTask(request *proto.CrawlRequest) (string, error) {
 	now := time.Now()
 
 	task := &domain.Task{
-		ID:             utils.GenerateID(),
+		ID:             taskID,
 		Request:        request,
 		PostsCollected: 0,
 		StartTime:      now,
 		EndTime:        time.Time{},
-		Status:         domain.TaskStatusPending,
+		Status:         domain.StatusPending.String(),
 	}
 
 	// 发送任务到任务通道（如果队列在运行）
+	tq.mutex.Lock()
 	if tq.isRunning {
 		tq.taskChan <- task
+		tq.mutex.Unlock()
 
-		task.Status = domain.TaskStatusRunning
+		task.Status = domain.StatusRunning.String()
 	} else {
-		task.Status = domain.TaskStatusFailed
+		tq.mutex.Unlock()
+		task.Status = domain.StatusFailed.String()
 		task.Err = fmt.Errorf("taskQueue is not running")
 		logx.Error(task.Err)
 	}

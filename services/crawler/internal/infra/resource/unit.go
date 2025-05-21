@@ -3,6 +3,7 @@ package resource
 import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/chromedpx"
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 type Unit struct {
@@ -15,7 +16,7 @@ type Unit struct {
 }
 
 func NewUnit(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) domain.ResourceUnit {
-	return &Unit{
+	unit := &Unit{
 		browser:        chromedpx.NewBrowser(dataDir, ip, fingerPrint, enableHeadless, browserPath),
 		ipProxy:        ip,
 		fingerPrint:    fingerPrint,
@@ -23,9 +24,11 @@ func NewUnit(dataDir string, ip string, fingerPrint string, enableHeadless bool,
 		enableHeadless: enableHeadless,
 		browserPath:    browserPath,
 	}
+
+	return unit
 }
 
-func (u *Unit) Update(dataDir string, ip string, fingerPrint string) {
+func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) {
 	u.browser.Close()
 
 	u.browser = chromedpx.NewBrowser(dataDir, ip, fingerPrint, u.enableHeadless, u.browserPath)
@@ -48,4 +51,27 @@ func (u *Unit) Fingerprint() string {
 
 func (u *Unit) DataDir() string {
 	return u.dataDir
+}
+
+// CheckHealth 检查资源单元是否健康
+func (u *Unit) CheckHealth() bool {
+	logx.Infof("检查资源单元健康")
+
+	// 如果没有浏览器实例，直接返回不健康
+	if u.browser == nil {
+		logx.Errorf("资源单元中发生错误，没有浏览器实例")
+		return false
+	}
+
+	// 尝试导航到空白页面
+	err := u.browser.Navigate("about:blank")
+	if err != nil {
+		logx.Errorf("访问空白页面出错,错误：%v", err)
+		return false
+	}
+	return true
+}
+
+func (u *Unit) Close() {
+	u.browser.Close()
 }

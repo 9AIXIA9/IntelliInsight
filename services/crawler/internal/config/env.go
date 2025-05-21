@@ -10,7 +10,7 @@ import (
 func LoadEnv() {
 	//加载根目录的 .env（覆盖现有变量）
 	if err := godotenv.Overload(); err != nil {
-		logx.Severef("load .env failed,err: %v", err)
+		logx.Severef("加载 .env 失败，错误: %v", err)
 	}
 
 	//获取并设置环境变量 APP_ENV

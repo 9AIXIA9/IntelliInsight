@@ -12,9 +12,9 @@ const (
 // Crawler 执行爬虫
 type Crawler interface {
 	// CollectPostLinks 根据 minLikes 筛选网页中的postURL
-	CollectPostLinks(resource ResourceUnit, site Site, keyword string, count int32, minLikes int32) (postLinks []string, err error)
+	CollectPostLinks(resource Browser, site Site, keyword string, count int32, minLikes int32) (postLinks []string, err error)
 	// CollectPostDetail 根据选项选择爬取帖子详情资源
-	CollectPostDetail(resource ResourceUnit, site Site, postURL string, opts ...*CollectPostDetailOption) (*proto.PostItem, error)
+	CollectPostDetail(resource Browser, site Site, postURL string, opts ...*CollectPostDetailOption) (*proto.PostItem, error)
 }
 
 type CollectPostDetailOption struct {

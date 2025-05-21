@@ -38,7 +38,7 @@ func (l *StartCrawlLogic) StartCrawl(in *proto.CrawlRequest) (*proto.CrawlRespon
 	}
 
 	// 提交任务到队列
-	taskID, err := l.svcCtx.CrawlerTaskQueue.AddTask(in)
+	taskID, err := l.svcCtx.TaskQueue.AddTask(in)
 	if err != nil {
 		return &proto.CrawlResponse{
 			TaskId:  taskID,

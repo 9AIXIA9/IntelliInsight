@@ -36,9 +36,7 @@ enum Site {
   XIAOHONGSHU = 0; //xiaohongshu
 }
 
-
-
-// 帖子数据结构
+// 帖子模型
 message PostItem {
   string post_id = 1;                 // 帖子ID https://www.xiaohongshu.com/explore/676425e6000000000b0164ab?xsec_token=
   string title = 2;                   // 标题 --> div.note-content 下的 title
@@ -55,18 +53,18 @@ message PostItem {
   string url = 14;                   // 帖子链接 note-item 下的 a href 是绝对路径
 }
 
-// 评论数据结构
+// 评论模型
 // 不用点击评论 自动会出来评论 同样也是无限下滑流的设计
 // replies 自动会浮现第一条回复 点击.div.show-more后就会加载更多回复
 message Comment {
-  string comment_id = 1;            // 评论ID class comment-item 的id就是评论id
+  string comment_id = 1;            // 评论ID  div.comment-item 的id就是评论id
   string content = 2;               // 评论内容 content 下的 note-text
   string author = 3;                // 评论作者 author 但是是一个链接 a 可从中获取名字
   int64 comment_time = 5;           // 评论时间戳 date （格式为04-16）
   string comment_location = 6;      // 评论位置 location （格式为湖南） 可能不存在
   repeated Comment replies = 7;     // 回复列表 reply-container
-  int32 likes = 4;                 // 评论点赞数 like 下的 count
-  int32 replies_count = 8;         // 回复数 reply 下的 count
+  int32 likes = 4;                 // 评论点赞数 div.like 下的 count
+  int32 replies_count = 8;         // 回复数 div.reply 下的 count
 }
 
 // 处理"今天"、"昨天"等相对时间 1天前 2天前 昨天 17:17 13小时前 03-09 -> 代表今年三月9号 2024-10-25
