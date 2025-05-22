@@ -2,21 +2,23 @@ package control
 
 import (
 	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/core/threading"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 )
 
 var (
 	quit = make(chan os.Signal) // 立即初始化通道
-	wg   sync.WaitGroup
 )
 
-// LogSevere 严重错误处理
-func LogSevere(format string, args ...interface{}) {
+type Unit interface {
+	Start()
+	Stop()
+}
+
+// LogSeveref 严重错误处理
+func LogSeveref(format string, args ...interface{}) {
 	logx.ErrorStackf(format, args...)
 
 	// 触发优雅关机信号
@@ -33,16 +35,14 @@ func LogSevere(format string, args ...interface{}) {
 	}
 }
 
-func Listen(services ...service.Service) {
+func Listen(units ...Unit) {
 
 	// 确保通道已被初始化并监听信号
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// 启动所有服务
-	for _, s := range services {
-		wg.Add(1)
+	for _, s := range units {
 		threading.GoSafe(func() {
-			defer wg.Done()
 			s.Start()
 		})
 	}
@@ -51,11 +51,9 @@ func Listen(services ...service.Service) {
 	<-quit
 
 	// 停止所有服务
-	for _, s := range services {
-		s.Stop()
+	for _, u := range units {
+		u.Stop()
 	}
 
-	wg.Wait()
 	logx.Info("所有服务已停止，程序即将退出")
-	os.Exit(1)
 }

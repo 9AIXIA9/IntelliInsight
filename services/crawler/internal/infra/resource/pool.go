@@ -43,7 +43,7 @@ type Pool struct {
 
 func MustNewResourcePool(conf config.Resource) domain.ResourcePool {
 	if len(conf.DataBasePath) == 0 {
-		control.LogSevere("资源池初始化失败：数据路径为空")
+		control.LogSeveref("资源池初始化失败：数据路径为空")
 	}
 
 	if conf.MaxPoolSize < 0 {
@@ -77,11 +77,11 @@ func MustNewResourcePool(conf config.Resource) domain.ResourcePool {
 
 	//加载用户数据目录
 	if err := pool.loadDataCatalog(conf.DataBasePath); err != nil {
-		control.LogSevere("加载数据目录失败：%v", err)
+		control.LogSeveref("加载数据目录失败：%v", err)
 	}
 
 	if err := pool.initialize(conf.InitialSize); err != nil {
-		control.LogSevere("初始化资源池失败：%v", err)
+		control.LogSeveref("初始化资源池失败：%v", err)
 	}
 
 	pool.AsyncHealthCheck(conf.HealthCheckInterval)

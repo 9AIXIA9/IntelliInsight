@@ -68,14 +68,14 @@ func (Site) EnumDescriptor() ([]byte, []int) {
 // 爬虫请求参数
 type CrawlRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Keyword           string                 `protobuf:"bytes,1,opt,name=keyword,proto3" json:"keyword,omitempty"`                                                 // 搜索关键词，例如"南昌"
-	PostCount         int32                  `protobuf:"varint,2,opt,name=post_count,json=postCount,proto3" json:"post_count,omitempty"`                           // 爬取帖子数量
-	IncludeComments   bool                   `protobuf:"varint,3,opt,name=include_comments,json=includeComments,proto3" json:"include_comments,omitempty"`         // 是否包含评论
+	Site              Site                   `protobuf:"varint,1,opt,name=site,proto3,enum=crawler.Site" json:"site,omitempty"`                                    //爬取站点
+	Keyword           string                 `protobuf:"bytes,2,opt,name=keyword,proto3" json:"keyword,omitempty"`                                                 // 搜索关键词，例如"南昌"
+	PostCount         int32                  `protobuf:"varint,3,opt,name=post_count,json=postCount,proto3" json:"post_count,omitempty"`                           // 爬取帖子数量
 	MinLikes          int32                  `protobuf:"varint,4,opt,name=min_likes,json=minLikes,proto3" json:"min_likes,omitempty"`                              // 最少点赞数筛选
-	CommentsPerPost   int32                  `protobuf:"varint,5,opt,name=comments_per_post,json=commentsPerPost,proto3" json:"comments_per_post,omitempty"`       // 每个帖子爬取的评论数量，0表示全部爬取
-	RepliesPerComment int32                  `protobuf:"varint,6,opt,name=replies_per_comment,json=repliesPerComment,proto3" json:"replies_per_comment,omitempty"` // 每条评论爬取的回复数量，0表示全部爬取
-	IncludeImages     bool                   `protobuf:"varint,7,opt,name=include_images,json=includeImages,proto3" json:"include_images,omitempty"`               // 是否爬取图片URL
-	Site              Site                   `protobuf:"varint,8,opt,name=site,proto3,enum=crawler.Site" json:"site,omitempty"`                                    //爬取站点
+	CommentsPerPost   int32                  `protobuf:"varint,5,opt,name=comments_per_post,json=commentsPerPost,proto3" json:"comments_per_post,omitempty"`       // 每个帖子爬取的评论数量
+	RepliesPerComment int32                  `protobuf:"varint,6,opt,name=replies_per_comment,json=repliesPerComment,proto3" json:"replies_per_comment,omitempty"` // 每条评论爬取的回复数量
+	IncludeComments   bool                   `protobuf:"varint,7,opt,name=include_comments,json=includeComments,proto3" json:"include_comments,omitempty"`         // 是否包含评论
+	IncludeImages     bool                   `protobuf:"varint,8,opt,name=include_images,json=includeImages,proto3" json:"include_images,omitempty"`               // 是否爬取图片URL
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -110,6 +110,13 @@ func (*CrawlRequest) Descriptor() ([]byte, []int) {
 	return file_shared_protos_crawler_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *CrawlRequest) GetSite() Site {
+	if x != nil {
+		return x.Site
+	}
+	return Site_XIAOHONGSHU
+}
+
 func (x *CrawlRequest) GetKeyword() string {
 	if x != nil {
 		return x.Keyword
@@ -122,13 +129,6 @@ func (x *CrawlRequest) GetPostCount() int32 {
 		return x.PostCount
 	}
 	return 0
-}
-
-func (x *CrawlRequest) GetIncludeComments() bool {
-	if x != nil {
-		return x.IncludeComments
-	}
-	return false
 }
 
 func (x *CrawlRequest) GetMinLikes() int32 {
@@ -152,18 +152,18 @@ func (x *CrawlRequest) GetRepliesPerComment() int32 {
 	return 0
 }
 
+func (x *CrawlRequest) GetIncludeComments() bool {
+	if x != nil {
+		return x.IncludeComments
+	}
+	return false
+}
+
 func (x *CrawlRequest) GetIncludeImages() bool {
 	if x != nil {
 		return x.IncludeImages
 	}
 	return false
-}
-
-func (x *CrawlRequest) GetSite() Site {
-	if x != nil {
-		return x.Site
-	}
-	return Site_XIAOHONGSHU
 }
 
 // 爬虫响应
@@ -227,22 +227,22 @@ func (x *CrawlResponse) GetMessage() string {
 	return ""
 }
 
-// 帖子数据结构
+// 帖子模型
 type PostItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PostId        string                 `protobuf:"bytes,1,opt,name=post_id,json=postId,proto3" json:"post_id,omitempty"`                 // 帖子ID https://www.xiaohongshu.com/explore/676425e6000000000b0164ab?xsec_token=
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`                                 // 标题 --> div.note-content 下的 title
 	Content       string                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`                             // 内容 --> note-content 下的 note-text
 	Author        string                 `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`                               // 作者 -->  span.username 选择第一个
+	Likes         int32                  `protobuf:"varint,5,opt,name=likes,proto3" json:"likes,omitempty"`                                // 点赞数  span.like-wrapper 下的 count
 	PublishTime   int64                  `protobuf:"varint,6,opt,name=publish_time,json=publishTime,proto3" json:"publish_time,omitempty"` // 发布时间戳 class date 今天 07:00 湖南 前半段
 	Images        []string               `protobuf:"bytes,7,rep,name=images,proto3" json:"images,omitempty"`                               // 图片URL列表  .div.img-container 下的img
 	Comments      []*Comment             `protobuf:"bytes,8,rep,name=comments,proto3" json:"comments,omitempty"`                           // 评论列表 .div.list-container 下
 	Tags          []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`                                   // 标签列表 --> div.note-content 下的 desc
-	Location      string                 `protobuf:"bytes,11,opt,name=location,proto3" json:"location,omitempty"`                          // 位置信息 class date 后半段
-	Likes         int32                  `protobuf:"varint,5,opt,name=likes,proto3" json:"likes,omitempty"`                                // 点赞数  span.like-wrapper 下的 count
-	Collects      int32                  `protobuf:"varint,12,opt,name=collects,proto3" json:"collects,omitempty"`                         // 收藏数 span.collect-wrapper 下的 count
-	Chats         int32                  `protobuf:"varint,13,opt,name=chats,proto3" json:"chats,omitempty"`                               // 评论数 span.chat-wrapper 下的 count
-	Url           string                 `protobuf:"bytes,14,opt,name=url,proto3" json:"url,omitempty"`                                    // 帖子链接 note-item 下的 a href 是绝对路径
+	Location      string                 `protobuf:"bytes,10,opt,name=location,proto3" json:"location,omitempty"`                          // 位置信息 class date 后半段
+	Collects      int32                  `protobuf:"varint,11,opt,name=collects,proto3" json:"collects,omitempty"`                         // 收藏数 span.collect-wrapper 下的 count
+	Chats         int32                  `protobuf:"varint,12,opt,name=chats,proto3" json:"chats,omitempty"`                               // 评论数 span.chat-wrapper 下的 count
+	Url           string                 `protobuf:"bytes,13,opt,name=url,proto3" json:"url,omitempty"`                                    // 帖子链接 note-item 下的 a href 是绝对路径
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -305,6 +305,13 @@ func (x *PostItem) GetAuthor() string {
 	return ""
 }
 
+func (x *PostItem) GetLikes() int32 {
+	if x != nil {
+		return x.Likes
+	}
+	return 0
+}
+
 func (x *PostItem) GetPublishTime() int64 {
 	if x != nil {
 		return x.PublishTime
@@ -340,13 +347,6 @@ func (x *PostItem) GetLocation() string {
 	return ""
 }
 
-func (x *PostItem) GetLikes() int32 {
-	if x != nil {
-		return x.Likes
-	}
-	return 0
-}
-
 func (x *PostItem) GetCollects() int32 {
 	if x != nil {
 		return x.Collects
@@ -368,19 +368,19 @@ func (x *PostItem) GetUrl() string {
 	return ""
 }
 
-// 评论数据结构
+// 评论模型
 // 不用点击评论 自动会出来评论 同样也是无限下滑流的设计
 // replies 自动会浮现第一条回复 点击.div.show-more后就会加载更多回复
 type Comment struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	CommentId       string                 `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`                   // 评论ID class comment-item 的id就是评论id
+	CommentId       string                 `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`                   // 评论ID  div.comment-item 的id就是评论id
 	Content         string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`                                        // 评论内容 content 下的 note-text
 	Author          string                 `protobuf:"bytes,3,opt,name=author,proto3" json:"author,omitempty"`                                          // 评论作者 author 但是是一个链接 a 可从中获取名字
+	Likes           int32                  `protobuf:"varint,4,opt,name=likes,proto3" json:"likes,omitempty"`                                           // 评论点赞数 div.like 下的 count
 	CommentTime     int64                  `protobuf:"varint,5,opt,name=comment_time,json=commentTime,proto3" json:"comment_time,omitempty"`            // 评论时间戳 date （格式为04-16）
 	CommentLocation string                 `protobuf:"bytes,6,opt,name=comment_location,json=commentLocation,proto3" json:"comment_location,omitempty"` // 评论位置 location （格式为湖南） 可能不存在
 	Replies         []*Comment             `protobuf:"bytes,7,rep,name=replies,proto3" json:"replies,omitempty"`                                        // 回复列表 reply-container
-	Likes           int32                  `protobuf:"varint,4,opt,name=likes,proto3" json:"likes,omitempty"`                                           // 评论点赞数 like 下的 count
-	RepliesCount    int32                  `protobuf:"varint,8,opt,name=replies_count,json=repliesCount,proto3" json:"replies_count,omitempty"`         // 回复数 reply 下的 count
+	RepliesCount    int32                  `protobuf:"varint,8,opt,name=replies_count,json=repliesCount,proto3" json:"replies_count,omitempty"`         // 回复数 div.reply 下的 count
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -436,6 +436,13 @@ func (x *Comment) GetAuthor() string {
 	return ""
 }
 
+func (x *Comment) GetLikes() int32 {
+	if x != nil {
+		return x.Likes
+	}
+	return 0
+}
+
 func (x *Comment) GetCommentTime() int64 {
 	if x != nil {
 		return x.CommentTime
@@ -457,13 +464,6 @@ func (x *Comment) GetReplies() []*Comment {
 	return nil
 }
 
-func (x *Comment) GetLikes() int32 {
-	if x != nil {
-		return x.Likes
-	}
-	return 0
-}
-
 func (x *Comment) GetRepliesCount() int32 {
 	if x != nil {
 		return x.RepliesCount
@@ -476,16 +476,16 @@ var File_shared_protos_crawler_proto protoreflect.FileDescriptor
 const file_shared_protos_crawler_proto_rawDesc = "" +
 	"\n" +
 	"\x1bshared/protos/crawler.proto\x12\acrawler\"\xb5\x02\n" +
-	"\fCrawlRequest\x12\x18\n" +
-	"\akeyword\x18\x01 \x01(\tR\akeyword\x12\x1d\n" +
+	"\fCrawlRequest\x12!\n" +
+	"\x04site\x18\x01 \x01(\x0e2\r.crawler.SiteR\x04site\x12\x18\n" +
+	"\akeyword\x18\x02 \x01(\tR\akeyword\x12\x1d\n" +
 	"\n" +
-	"post_count\x18\x02 \x01(\x05R\tpostCount\x12)\n" +
-	"\x10include_comments\x18\x03 \x01(\bR\x0fincludeComments\x12\x1b\n" +
+	"post_count\x18\x03 \x01(\x05R\tpostCount\x12\x1b\n" +
 	"\tmin_likes\x18\x04 \x01(\x05R\bminLikes\x12*\n" +
 	"\x11comments_per_post\x18\x05 \x01(\x05R\x0fcommentsPerPost\x12.\n" +
-	"\x13replies_per_comment\x18\x06 \x01(\x05R\x11repliesPerComment\x12%\n" +
-	"\x0einclude_images\x18\a \x01(\bR\rincludeImages\x12!\n" +
-	"\x04site\x18\b \x01(\x0e2\r.crawler.SiteR\x04site\"\\\n" +
+	"\x13replies_per_comment\x18\x06 \x01(\x05R\x11repliesPerComment\x12)\n" +
+	"\x10include_comments\x18\a \x01(\bR\x0fincludeComments\x12%\n" +
+	"\x0einclude_images\x18\b \x01(\bR\rincludeImages\"\\\n" +
 	"\rCrawlResponse\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
@@ -494,25 +494,26 @@ const file_shared_protos_crawler_proto_rawDesc = "" +
 	"\apost_id\x18\x01 \x01(\tR\x06postId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x18\n" +
 	"\acontent\x18\x03 \x01(\tR\acontent\x12\x16\n" +
-	"\x06author\x18\x04 \x01(\tR\x06author\x12!\n" +
+	"\x06author\x18\x04 \x01(\tR\x06author\x12\x14\n" +
+	"\x05likes\x18\x05 \x01(\x05R\x05likes\x12!\n" +
 	"\fpublish_time\x18\x06 \x01(\x03R\vpublishTime\x12\x16\n" +
 	"\x06images\x18\a \x03(\tR\x06images\x12,\n" +
 	"\bcomments\x18\b \x03(\v2\x10.crawler.CommentR\bcomments\x12\x12\n" +
 	"\x04tags\x18\t \x03(\tR\x04tags\x12\x1a\n" +
-	"\blocation\x18\v \x01(\tR\blocation\x12\x14\n" +
-	"\x05likes\x18\x05 \x01(\x05R\x05likes\x12\x1a\n" +
-	"\bcollects\x18\f \x01(\x05R\bcollects\x12\x14\n" +
-	"\x05chats\x18\r \x01(\x05R\x05chats\x12\x10\n" +
-	"\x03url\x18\x0e \x01(\tR\x03url\"\x8f\x02\n" +
+	"\blocation\x18\n" +
+	" \x01(\tR\blocation\x12\x1a\n" +
+	"\bcollects\x18\v \x01(\x05R\bcollects\x12\x14\n" +
+	"\x05chats\x18\f \x01(\x05R\x05chats\x12\x10\n" +
+	"\x03url\x18\r \x01(\tR\x03url\"\x8f\x02\n" +
 	"\aComment\x12\x1d\n" +
 	"\n" +
 	"comment_id\x18\x01 \x01(\tR\tcommentId\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x16\n" +
-	"\x06author\x18\x03 \x01(\tR\x06author\x12!\n" +
+	"\x06author\x18\x03 \x01(\tR\x06author\x12\x14\n" +
+	"\x05likes\x18\x04 \x01(\x05R\x05likes\x12!\n" +
 	"\fcomment_time\x18\x05 \x01(\x03R\vcommentTime\x12)\n" +
 	"\x10comment_location\x18\x06 \x01(\tR\x0fcommentLocation\x12*\n" +
-	"\areplies\x18\a \x03(\v2\x10.crawler.CommentR\areplies\x12\x14\n" +
-	"\x05likes\x18\x04 \x01(\x05R\x05likes\x12#\n" +
+	"\areplies\x18\a \x03(\v2\x10.crawler.CommentR\areplies\x12#\n" +
 	"\rreplies_count\x18\b \x01(\x05R\frepliesCount*\x17\n" +
 	"\x04Site\x12\x0f\n" +
 	"\vXIAOHONGSHU\x10\x002M\n" +

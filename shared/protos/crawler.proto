@@ -16,10 +16,10 @@ message CrawlRequest {
   string keyword = 2;                  // 搜索关键词，例如"南昌"
   int32 post_count = 3;                // 爬取帖子数量
   int32 min_likes = 4;                 // 最少点赞数筛选
-  optional int32 comments_per_post = 5;         // 每个帖子爬取的评论数量
-  optional int32 replies_per_comment = 6;       // 每条评论爬取的回复数量
-  optional  bool include_comments = 7;           // 是否包含评论
-  optional bool include_images = 8;             // 是否爬取图片URL
+  int32 comments_per_post = 5;         // 每个帖子爬取的评论数量
+  int32 replies_per_comment = 6;       // 每条评论爬取的回复数量
+  bool include_comments = 7;           // 是否包含评论
+  bool include_images = 8;             // 是否爬取图片URL
 }
 
 // 爬虫响应
@@ -42,15 +42,15 @@ message PostItem {
   string title = 2;                   // 标题 --> div.note-content 下的 title
   string content = 3;                 // 内容 --> note-content 下的 note-text
   string author = 4;                  // 作者 -->  span.username 选择第一个
+  int32 likes = 5;                    // 点赞数  span.like-wrapper 下的 count
   int64 publish_time = 6;             // 发布时间戳 class date 今天 07:00 湖南 前半段
   repeated string images = 7;         // 图片URL列表  .div.img-container 下的img
   repeated Comment comments = 8;      // 评论列表 .div.list-container 下
   repeated string tags = 9;           // 标签列表 --> div.note-content 下的 desc
-  string location = 11;               // 位置信息 class date 后半段
-  int32 likes = 5;                   // 点赞数  span.like-wrapper 下的 count
-  int32 collects = 12;               // 收藏数 span.collect-wrapper 下的 count
-  int32 chats = 13;                  // 评论数 span.chat-wrapper 下的 count
-  string url = 14;                   // 帖子链接 note-item 下的 a href 是绝对路径
+  string location = 10;               // 位置信息 class date 后半段
+  int32 collects = 11;                // 收藏数 span.collect-wrapper 下的 count
+  int32 chats = 12;                   // 评论数 span.chat-wrapper 下的 count
+  string url = 13;                    // 帖子链接 note-item 下的 a href 是绝对路径
 }
 
 // 评论模型
@@ -60,11 +60,11 @@ message Comment {
   string comment_id = 1;            // 评论ID  div.comment-item 的id就是评论id
   string content = 2;               // 评论内容 content 下的 note-text
   string author = 3;                // 评论作者 author 但是是一个链接 a 可从中获取名字
+  int32 likes = 4;                  // 评论点赞数 div.like 下的 count
   int64 comment_time = 5;           // 评论时间戳 date （格式为04-16）
   string comment_location = 6;      // 评论位置 location （格式为湖南） 可能不存在
   repeated Comment replies = 7;     // 回复列表 reply-container
-  int32 likes = 4;                 // 评论点赞数 div.like 下的 count
-  int32 replies_count = 8;         // 回复数 div.reply 下的 count
+  int32 replies_count = 8;          // 回复数 div.reply 下的 count
 }
 
 // 处理"今天"、"昨天"等相对时间 1天前 2天前 昨天 17:17 13小时前 03-09 -> 代表今年三月9号 2024-10-25

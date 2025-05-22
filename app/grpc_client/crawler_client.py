@@ -49,9 +49,22 @@ class CrawlerClient:
     def connect(self) -> None:
         """连接到爬虫gRPC服务"""
         if self._channel is None:
-            logger.info(f"连接爬虫服务: {self.config.address}")
-            self._channel = grpc.insecure_channel(self.config.address)
-            self._stub = crawler_pb2_grpc.CrawlerServiceStub(self._channel)
+            try:
+                logger.info(f"连接爬虫服务: {self.config.address}")
+                self._channel = grpc.insecure_channel(self.config.address)
+                self._stub = crawler_pb2_grpc.CrawlerServiceStub(self._channel)
+
+                # 验证stub是否成功创建
+                if self._stub is None:
+                    logger.error("创建gRPC stub失败")
+                    raise RuntimeError("创建gRPC stub失败")
+
+                logger.info("爬虫服务连接成功")
+            except Exception as e:
+                logger.error(f"连接爬虫服务失败: {str(e)}")
+                self._channel = None
+                self._stub = None
+                raise
 
     def close(self) -> None:
         """关闭连接"""
@@ -99,6 +112,7 @@ class CrawlerClient:
 
     def start_crawl(self,
                     keyword: str,
+                    site: int = 0,  # 默认使用XIAOHONGSHU(0)
                     post_count: int = 10,
                     include_comments: bool = True,
                     min_likes: int = 0,
@@ -109,6 +123,7 @@ class CrawlerClient:
 
         Args:
             keyword: 搜索关键词
+            site: 爬取站点，默认为小红书(0)
             post_count: 爬取帖子数量
             include_comments: 是否包含评论
             min_likes: 最少点赞数筛选
@@ -120,6 +135,7 @@ class CrawlerClient:
             包含任务ID、成功状态和消息的字典
         """
         request = crawler_pb2.CrawlRequest(
+            site=site,  # 添加site参数
             keyword=keyword,
             post_count=post_count,
             include_comments=include_comments,
@@ -129,12 +145,12 @@ class CrawlerClient:
             include_images=include_images
         )
 
-        response = self._execute_with_retry(
-            lambda: self._stub.StartCrawl(request, timeout=self.config.timeout)
-        )
+        # 发起RPC调用并获取响应
+        response = self._execute_with_retry(self._stub.StartCrawl, request, timeout=self.config.timeout)
 
+        # 将gRPC响应转换为字典
         return {
-            "task_id": response.task_id,
-            "success": response.success,
-            "message": response.message
+            'task_id': response.task_id,
+            'success': response.success,
+            'message': response.message
         }

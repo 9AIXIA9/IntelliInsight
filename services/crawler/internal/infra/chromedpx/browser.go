@@ -214,8 +214,8 @@ func getOptions(dataDir string, ip string, fingerPrint string, enableHeadless bo
 		chromedp.UserDataDir(dataDir),
 
 		// 添加窗口尺寸参数
-		chromedp.WindowSize(1080, 540),
-		chromedp.Flag("window-size", "1080,540"),
+		chromedp.WindowSize(1080, 810),
+		chromedp.Flag("window-size", "1080,810"),
 	}
 
 	// 添加代理选项

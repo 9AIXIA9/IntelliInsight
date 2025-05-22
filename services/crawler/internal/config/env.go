@@ -11,7 +11,7 @@ import (
 func LoadEnv() {
 	//加载根目录的 .env（覆盖现有变量）
 	if err := godotenv.Overload(); err != nil {
-		control.LogSevere("加载 .env 失败，错误: %v", err)
+		control.LogSeveref("加载 .env 失败，错误: %v", err)
 	}
 
 	//获取并设置环境变量 APP_ENV
@@ -24,6 +24,6 @@ func LoadEnv() {
 	//加载环境专属的 .env 文件（如 .env.dev）
 	envFile := fmt.Sprintf(".env.%s", env)
 	if err := godotenv.Overload(envFile); err != nil {
-		control.LogSevere("无法加载环境文件 %s：%v", envFile, err)
+		control.LogSeveref("无法加载环境文件 %s：%v", envFile, err)
 	}
 }

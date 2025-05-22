@@ -32,7 +32,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 	}
 
 	// 在页面导航后添加随机延时
-	utils.DelayRandomly(4000)
+	utils.DelayRandomly(6000)
 
 	//检查是否需要登录
 	content := browser.GetPageContent()
@@ -52,7 +52,8 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 
 	for i := 0; i < maxTimes; i++ {
 		content = browser.GetPageContent()
-		//开始之前的数量
+
+		//记录收集前的数量
 		start := len(links)
 
 		rawLinks, err := site.ParsePostLinks(content, minLikes)
@@ -70,7 +71,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 			}
 		}
 
-		//没有增多 -> 到底
+		//判断链接是否增多
 		if len(links) == start {
 			return links, nil
 		}
@@ -102,7 +103,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 	}
 
 	// 在页面导航后添加随机延时
-	utils.DelayRandomly(4000)
+	utils.DelayRandomly(6000)
 
 	content := browser.GetPageContent()
 	if site.NeedsLogin(content) {
@@ -114,7 +115,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 
 		logx.Infof("登录成功%v", site.GetName())
 		// 登录成功后添加随机延时
-		utils.DelayRandomly(2500)
+		utils.DelayRandomly(5000)
 	}
 
 	//基础信息
@@ -123,11 +124,11 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		return nil, err
 	}
 
+	post.PostId = site.FormatPostID(postURL)
+	post.Url = postURL
+
 	//获取评论及回复
 	if opt.IncludeComments {
-		// 获取评论前添加随机延时
-		utils.DelayRandomly(2000)
-
 		comments, err := site.ParseComments(content, opt.CommentsPerPost, opt.RepliesPerComment)
 		if err != nil {
 			logx.Errorf("获取评论错误：%v", err)
@@ -135,6 +136,8 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		}
 		post.Comments = comments
 	}
+
+	logx.Infof("帖子:%v", post)
 
 	return post, nil
 }

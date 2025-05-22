@@ -11,8 +11,8 @@ if current_dir not in sys.path:
 
 # 动态导入模块
 try:
-    from crawler_pb2 import CrawlRequest, CrawlResponse, PostItem, Comment, TaskStatus
-    from crawler_pb2 import DESCRIPTOR, _TASKSTATUS, _CRAWLREQUEST, _CRAWLRESPONSE, _POSTITEM, _COMMENT, _CRAWLERSERVICE
+    from crawler_pb2 import CrawlRequest, CrawlResponse, PostItem, Comment, Site
+    from crawler_pb2 import DESCRIPTOR, _CRAWLREQUEST, _CRAWLRESPONSE, _POSTITEM, _COMMENT, _CRAWLERSERVICE, _SITE
     from crawler_pb2_grpc import CrawlerServiceStub
 except ImportError:
     # 如果直接导入失败，尝试更复杂的方法
@@ -37,8 +37,8 @@ except ImportError:
     CrawlResponse = pb2.CrawlResponse
     PostItem = pb2.PostItem
     Comment = pb2.Comment
-    TaskStatus = pb2.TaskStatus
+    Site = pb2.Site
     CrawlerServiceStub = pb2_grpc.CrawlerServiceStub
 
 # 导出类以供使用
-__all__ = ['CrawlRequest', 'CrawlResponse', 'TaskStatus', 'PostItem', 'Comment', 'CrawlerServiceStub']
+__all__ = ['CrawlRequest', 'CrawlResponse', 'Site', 'PostItem', 'Comment', 'CrawlerServiceStub']

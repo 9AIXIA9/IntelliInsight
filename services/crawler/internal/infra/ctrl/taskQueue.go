@@ -34,7 +34,7 @@ type TaskQueue struct {
 // NewTaskQueue 创建爬虫任务队列
 func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, resourcePool domain.ResourcePool) domain.TaskQueue {
 	if repo == nil {
-		control.LogSevere("仓库不能为空")
+		control.LogSeveref("仓库不能为空")
 	}
 
 	tq := &TaskQueue{

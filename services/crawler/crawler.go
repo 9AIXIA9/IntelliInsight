@@ -32,48 +32,38 @@ func main() {
 	conf.MustLoad(*configFile, &c, conf.UseEnv())
 	ctx := svc.MustNewServiceContext(&c)
 
-	var stopFn func()
-
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		proto.RegisterCrawlerServiceServer(grpcServer, server.NewCrawlerServiceServer(ctx))
 
 		if c.Mode == service.DevMode || c.Mode == service.TestMode {
 			reflection.Register(grpcServer)
 		}
-
-		stopFn = grpcServer.GracefulStop
 	})
 
 	control.Listen(&WrappedServer{
-		conf: &c,
-		ctx:  ctx,
-		startFn: func() {
-			s.Start()
-		},
-		stopFn: func() {
-			stopFn()
-		},
+		conf:   &c,
+		ctx:    ctx,
+		server: s,
 	})
 }
 
 type WrappedServer struct {
-	conf    *config.Config
-	ctx     *svc.ServiceContext
-	startFn func()
-	stopFn  func()
+	conf   *config.Config
+	ctx    *svc.ServiceContext
+	server *zrpc.RpcServer
 }
 
 func (s *WrappedServer) Start() {
 	// 添加Consul服务注册
 	if err := consul.RegisterService(s.conf.ListenOn, s.conf.Consul); err != nil {
-		control.LogSevere("注册服务到Consul失败: %v", err)
+		control.LogSeveref("注册服务到Consul失败: %v", err)
 		return
 	}
 	logx.Infof("成功注册服务到Consul")
 
 	logx.Infof("启动RPC服务在：%s...\n", s.conf.ListenOn)
 
-	s.startFn()
+	s.server.Start()
 }
 
 func (s *WrappedServer) Stop() {
@@ -88,5 +78,7 @@ func (s *WrappedServer) Stop() {
 	s.ctx.TaskQueue.Stop(stopCtx)
 	logx.Info("任务队列已停止")
 
-	s.stopFn()
+	//关闭服务器
+	logx.Infof("关闭服务器...")
+	s.server.Stop()
 }
