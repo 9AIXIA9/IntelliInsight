@@ -3,6 +3,7 @@ package site
 import (
 	"crawler/internal/domain"
 	"crawler/proto"
+	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"net/url"
@@ -414,5 +415,5 @@ func (X XHS) Login() error {
 	// 实际项目中需要实现登录逻辑
 	// 可能涉及到扫码登录、账号密码登录等
 	// 这里简化处理，返回未实现错误
-	return fmt.Errorf("登录功能未实现")
+	return errors.New("登录功能未实现")
 }

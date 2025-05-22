@@ -31,16 +31,21 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 		return nil, err
 	}
 
+	// 在页面导航后添加随机延时
+	utils.DelayRandomly(4000)
+
 	//检查是否需要登录
 	content := browser.GetPageContent()
 	if site.NeedsLogin(content) {
 		logx.Infof("%v需要登录", site.GetName())
 
 		if err = site.Login(); err != nil {
-			return nil, fmt.Errorf("登录站点%s,出错：%v", site.GetName(), err)
+			return nil, fmt.Errorf("登录站点%s,出错：%w", site.GetName(), err)
 		}
 
 		logx.Infof("登录成功%v", site.GetName())
+		// 登录成功后添加随机延时
+		utils.DelayRandomly(2500)
 	}
 
 	links := make([]string, 0, count)
@@ -96,15 +101,20 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		return nil, err
 	}
 
+	// 在页面导航后添加随机延时
+	utils.DelayRandomly(4000)
+
 	content := browser.GetPageContent()
 	if site.NeedsLogin(content) {
 		logx.Infof("%v需要登录", site.GetName())
 
 		if err = site.Login(); err != nil {
-			return nil, fmt.Errorf("登录站点%s,出错：%v", site.GetName(), err)
+			return nil, fmt.Errorf("登录站点%s,出错：%w", site.GetName(), err)
 		}
 
 		logx.Infof("登录成功%v", site.GetName())
+		// 登录成功后添加随机延时
+		utils.DelayRandomly(2500)
 	}
 
 	//基础信息
@@ -115,6 +125,9 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 
 	//获取评论及回复
 	if opt.IncludeComments {
+		// 获取评论前添加随机延时
+		utils.DelayRandomly(2000)
+
 		comments, err := site.ParseComments(content, opt.CommentsPerPost, opt.RepliesPerComment)
 		if err != nil {
 			logx.Errorf("获取评论错误：%v", err)

@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"github.com/chromedp/chromedp"
 	"github.com/zeromicro/go-zero/core/logx"
-	"io/ioutil"
+	"os"
 	"sync"
-	"time"
 )
 
 type Browser struct {
@@ -19,75 +18,64 @@ type Browser struct {
 	mutex       sync.Mutex // 保护浏览器操作线程安全
 }
 
-func NewBrowser(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) domain.Browser {
+func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) (domain.Browser, error) {
+	parentCtx := context.Background()
+
 	logx.Infof("初始化浏览器: 数据目录=%s, 代理IP=%s", dataDir, ip)
+
+	// 确保数据目录存在
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			return nil, fmt.Errorf("创建浏览器数据目录失败: %w", err)
+		}
+	}
 
 	opts := getOptions(dataDir, ip, fingerPrint, enableHeadless, browserPath)
 
-	// 创建有超时的上下文
-	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	// 创建新的执行分配器
+	ctx, cancel := chromedp.NewExecAllocator(parentCtx, opts...)
 
-	// 创建浏览器上下文并保存取消函数
-	ctx, cancel := chromedp.NewContext(allocCtx)
+	// 创建浏览器上下文，添加日志记录
+	browserCtx, browserCancel := chromedp.NewContext(
+		ctx,
+		chromedp.WithLogf(logx.Infof),
+	)
 
+	// 创建浏览器对象
 	browser := &Browser{
-		ctx: ctx,
+		ctx: browserCtx,
 		cancelFunc: func() {
-			cancel()      // 先取消浏览器上下文
-			allocCancel() // 再取消分配器上下文
+			browserCancel() // 先取消浏览器上下文
+			cancel()        // 再取消分配器上下文
+			logx.Info("浏览器实例已关闭")
 		},
 		fingerPrint: fingerPrint,
 		execPath:    browserPath,
 		mutex:       sync.Mutex{},
 	}
 
-	if err := chromedp.Run(ctx, chromedp.Navigate("about:blank")); err != nil {
-		logx.Errorf("浏览器初始化失败: %v", err)
-		browser.Close()
-		return nil
+	if err := browser.CheckHealth(); err != nil {
+		return nil, err
 	}
-
-	return browser
+	return browser, nil
 }
 
-func getOptions(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) []chromedp.ExecAllocatorOption {
-	// 设置Chrome选项
-	opts := []chromedp.ExecAllocatorOption{
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-		chromedp.DisableGPU,
-		chromedp.UserDataDir(dataDir),
+func (b *Browser) CheckHealth() error {
+	// 使用页面状态检查
+	var result bool
+	err := chromedp.Run(b.ctx, chromedp.Evaluate(`document.readyState === "complete"`, &result))
+	if err != nil {
+		b.Close()
+		return fmt.Errorf("浏览器状态检查失败：%w", err)
 	}
-
-	// 仅当IP不是localhost或127.0.0.1时才设置代理
-	if ip != "" && ip != "localhost" && ip != "127.0.0.1" {
-		logx.Infof("使用代理: %s", ip)
-		opts = append(opts, chromedp.ProxyServer(ip))
-	}
-
-	if browserPath != "" {
-		opts = append(opts, chromedp.ExecPath(browserPath))
-	}
-
-	if enableHeadless {
-		opts = append(opts, chromedp.Headless)
-	}
-
-	if fingerPrint != "" {
-		opts = append(opts, chromedp.UserAgent(fingerPrint))
-	}
-
-	return opts
+	return nil
 }
 
 func (b *Browser) Navigate(url string) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	timeoutCtx, cancel := context.WithTimeout(b.ctx, 30*time.Second)
-	defer cancel()
-
-	return chromedp.Run(timeoutCtx, chromedp.Navigate(url))
+	return chromedp.Run(b.ctx, chromedp.Navigate(url))
 }
 
 func (b *Browser) GetPageContent() string {
@@ -183,46 +171,76 @@ func (b *Browser) Screenshot(path string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, buf, 0644)
+	return os.WriteFile(path, buf, 0644)
 }
 
 func (b *Browser) Close() {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	if b.cancelFunc != nil {
 		b.cancelFunc()
 	}
 }
 
-// Element 实现domain.Element接口
-type Element struct {
-	browser  *Browser
-	selector string
-}
+func getOptions(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) []chromedp.ExecAllocatorOption {
+	// 基础选项
+	opts := []chromedp.ExecAllocatorOption{
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+		chromedp.DisableGPU,
+		// 添加一些额外选项来提高稳定性
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-client-side-phishing-detection", true),
+		chromedp.Flag("disable-default-apps", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-features", "site-per-process,TranslateUI,BlinkGenPropertyTrees"),
+		chromedp.Flag("disable-hang-monitor", true),
+		chromedp.Flag("disable-ipc-flooding-protection", true),
+		chromedp.Flag("disable-popup-blocking", true),
+		chromedp.Flag("disable-prompt-on-repost", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("force-color-profile", "srgb"),
+		chromedp.Flag("metrics-recording-only", true),
+		chromedp.Flag("safebrowsing-disable-auto-update", true),
+		chromedp.Flag("password-store", "basic"),
+		chromedp.Flag("use-mock-keychain", true),
+		// 添加数据目录
+		chromedp.UserDataDir(dataDir),
 
-func (e *Element) Click() error {
-	return chromedp.Run(e.browser.ctx, chromedp.Click(e.selector))
-}
-
-func (e *Element) Input(text string) error {
-	return chromedp.Run(e.browser.ctx,
-		chromedp.Clear(e.selector),
-		chromedp.SendKeys(e.selector, text),
-	)
-}
-
-func (e *Element) GetText() string {
-	var text string
-	err := chromedp.Run(e.browser.ctx, chromedp.Text(e.selector, &text))
-	if err != nil {
-		return ""
+		// 添加窗口尺寸参数
+		chromedp.WindowSize(1080, 540),
+		chromedp.Flag("window-size", "1080,540"),
 	}
-	return text
-}
 
-func (e *Element) GetAttribute(name string) string {
-	var value string
-	err := chromedp.Run(e.browser.ctx, chromedp.AttributeValue(e.selector, name, &value, nil))
-	if err != nil {
-		return ""
+	// 添加代理选项
+	if ip != "" && (ip == "http://localhost" || ip == "http://127.0.0.1") {
+		opts = append(opts, chromedp.ProxyServer(ip))
 	}
-	return value
+
+	// 设置浏览器路径
+	if browserPath != "" {
+		if _, err := os.Stat(browserPath); err == nil {
+			opts = append(opts, chromedp.ExecPath(browserPath))
+		} else {
+			logx.Errorf("浏览器路径不存在: %s", browserPath)
+		}
+	}
+
+	// 无头模式
+	if enableHeadless {
+		opts = append(opts, chromedp.Headless)
+	}
+
+	// 用户代理
+	if fingerPrint != "" {
+		opts = append(opts, chromedp.UserAgent(fingerPrint))
+	}
+
+	return opts
 }

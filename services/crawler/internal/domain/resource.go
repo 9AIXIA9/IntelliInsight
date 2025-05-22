@@ -11,21 +11,19 @@ type ResourceUnit interface {
 	IP() string
 	Fingerprint() string
 	DataDir() string
-	Refresh(dataDir string, ip string, fingerPrint string)
-	CheckHealth() bool
+	Refresh(dataDir string, ip string, fingerPrint string) error
+	CheckHealth() error
 	Close()
 }
 
 // ResourcePool 资源池接口
 type ResourcePool interface {
-	GetResource(ctx context.Context) (ResourceUnit, error)
-	ReleaseResource(ResourceUnit)
-	RefreshResource(ResourceUnit) ResourceUnit
-	AsyncHealthCheck(interval time.Duration)
-	CheckUnitsHealth()
+	Get(ctx context.Context) (ResourceUnit, error)
+	Put(ResourceUnit)
+	Refresh(ResourceUnit) error
 	LoadBalancingStrategy() LoadBalancingStrategy
-	LoadBalancing() (dataDir string, ip string, fingerPrint string)
-	Close()
+	AsyncHealthCheck(interval time.Duration)
+	Close(ctx context.Context)
 }
 
 type LoadBalancingStrategy int

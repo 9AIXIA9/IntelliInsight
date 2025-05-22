@@ -11,6 +11,7 @@ type Browser interface {
 	ScrollPage() error
 	ExecuteJS(script string, result interface{}) error
 	Screenshot(path string) error
+	CheckHealth() error
 	Close()
 }
 

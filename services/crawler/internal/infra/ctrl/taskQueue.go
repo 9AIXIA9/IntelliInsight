@@ -3,10 +3,12 @@ package ctrl
 import (
 	"context"
 	"crawler/internal/config"
+	"crawler/internal/control"
 	"crawler/internal/domain"
 	"crawler/internal/infra/crawler"
 	"crawler/internal/infra/site"
 	"crawler/internal/infra/utils"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -32,7 +34,7 @@ type TaskQueue struct {
 // NewTaskQueue 创建爬虫任务队列
 func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, resourcePool domain.ResourcePool) domain.TaskQueue {
 	if repo == nil {
-		logx.Severef("仓库不能为空")
+		control.LogSevere("仓库不能为空")
 	}
 
 	tq := &TaskQueue{
@@ -82,12 +84,6 @@ func (tq *TaskQueue) Dispatcher() {
 // ProcessTask 处理单个任务的逻辑
 func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	defer func() {
-		if r := recover(); r != nil {
-			task.Status = domain.StatusFailed.String()
-			task.Err = fmt.Errorf("任务执行出现panic: %v", r)
-			logx.Errorf("任务ID: %s 执行出现panic: %v", task.ID, r)
-		}
-
 		task.EndTime = time.Now()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -101,7 +97,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	s, err := site.Convert(task.Request.Site)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
-		task.Err = fmt.Errorf("无法获取资源实例")
+		task.Err = errors.New("无法获取资源实例")
 		logx.Error(task.Err)
 		return
 	}
@@ -110,15 +106,15 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	resource, err := tq.resourcePool.GetResource(ctx)
+	resource, err := tq.resourcePool.Get(ctx)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
-		task.Err = fmt.Errorf("无法获取资源实例")
+		task.Err = errors.New("无法获取资源实例")
 		logx.Error(task.Err)
 		return
 	}
 	// 确保使用完后归还浏览器
-	defer tq.resourcePool.ReleaseResource(resource)
+	defer tq.resourcePool.Put(resource)
 
 	startTime := time.Now()
 
@@ -128,7 +124,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	links, err := tq.crawler.CollectPostLinks(resource.Browser(), s, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
-		task.Err = fmt.Errorf("收集帖子链接失败：%v", err)
+		task.Err = fmt.Errorf("收集帖子链接失败：%w", err)
 		logx.Error(task.Err)
 		return
 	}
@@ -193,18 +189,18 @@ func (tq *TaskQueue) AddTask(request *proto.CrawlRequest) (string, error) {
 		tq.mutex.Unlock()
 
 		task.Status = domain.StatusRunning.String()
-	} else {
-		tq.mutex.Unlock()
-		task.Status = domain.StatusFailed.String()
-		task.Err = fmt.Errorf("taskQueue is not running")
-		logx.Error(task.Err)
+		return taskID, nil
 	}
 
-	return taskID, nil
+	tq.mutex.Unlock()
+	task.Status = domain.StatusFailed.String()
+	task.Err = errors.New("任务队列未运行")
+	logx.Error(task.Err)
+	return taskID, task.Err
 }
 
 // Stop 停止任务队列处理
-func (tq *TaskQueue) Stop() {
+func (tq *TaskQueue) Stop(ctx context.Context) {
 	tq.mutex.Lock()
 	if !tq.isRunning {
 		tq.mutex.Unlock()
@@ -219,5 +215,5 @@ func (tq *TaskQueue) Stop() {
 	tq.waitGroup.Wait()
 
 	// 关闭资源池
-	tq.resourcePool.Close()
+	tq.resourcePool.Close(ctx)
 }

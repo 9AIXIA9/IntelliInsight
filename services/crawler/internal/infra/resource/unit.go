@@ -3,6 +3,8 @@ package resource
 import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/chromedpx"
+	"errors"
+	"fmt"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -15,26 +17,35 @@ type Unit struct {
 	browserPath    string
 }
 
-func NewUnit(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) domain.ResourceUnit {
-	unit := &Unit{
-		browser:        chromedpx.NewBrowser(dataDir, ip, fingerPrint, enableHeadless, browserPath),
+func NewHealthyUnit(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) (domain.ResourceUnit, error) {
+	browser, err := chromedpx.NewHealthyBrowser(dataDir, ip, fingerPrint, enableHeadless, browserPath)
+	if err != nil {
+		return nil, fmt.Errorf("新建浏览器错误：%v", err)
+	}
+
+	return &Unit{
+		browser:        browser,
 		ipProxy:        ip,
 		fingerPrint:    fingerPrint,
 		dataDir:        dataDir,
 		enableHeadless: enableHeadless,
 		browserPath:    browserPath,
-	}
-
-	return unit
+	}, nil
 }
 
-func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) {
-	u.browser.Close()
+func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) error {
+	if u.browser != nil {
+		u.browser.Close()
+	}
 
-	u.browser = chromedpx.NewBrowser(dataDir, ip, fingerPrint, u.enableHeadless, u.browserPath)
+	var err error
 	u.dataDir = dataDir
 	u.ipProxy = ip
 	u.fingerPrint = fingerPrint
+	if u.browser, err = chromedpx.NewHealthyBrowser(dataDir, ip, fingerPrint, u.enableHeadless, u.browserPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (u *Unit) Browser() domain.Browser {
@@ -54,24 +65,18 @@ func (u *Unit) DataDir() string {
 }
 
 // CheckHealth 检查资源单元是否健康
-func (u *Unit) CheckHealth() bool {
+func (u *Unit) CheckHealth() error {
 	logx.Infof("检查资源单元健康")
 
 	// 如果没有浏览器实例，直接返回不健康
 	if u.browser == nil {
-		logx.Errorf("资源单元中发生错误，没有浏览器实例")
-		return false
+		return errors.New("资源单元中发生错误，没有浏览器实例")
 	}
-
-	// 尝试导航到空白页面
-	err := u.browser.Navigate("about:blank")
-	if err != nil {
-		logx.Errorf("访问空白页面出错,错误：%v", err)
-		return false
-	}
-	return true
+	return u.browser.CheckHealth()
 }
 
 func (u *Unit) Close() {
-	u.browser.Close()
+	if u.browser != nil {
+		u.browser.Close()
+	}
 }
