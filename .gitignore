@@ -1,5 +1,5 @@
 # --- 浏览器数据文件 ---
-./shared/browser_data
+browser_data/
 
 # --- 系统文件 ---
 .DS_Store
