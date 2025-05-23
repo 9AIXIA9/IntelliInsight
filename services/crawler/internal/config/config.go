@@ -26,8 +26,9 @@ type MongoDB struct {
 	TaskCollection string
 }
 type TaskQueue struct {
-	WorkQueueSize int
-	MaxWorkers    int
+	WorkQueueSize    int
+	MaxWorkers       int
+	MaxTaskCacheSize int
 }
 
 type Resource struct {

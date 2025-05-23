@@ -260,12 +260,15 @@ func (p *Pool) Get(ctx context.Context) (domain.ResourceUnit, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case unit := <-p.units:
+		logx.Debugf("从资源池中获取资源")
 		err := p.checkAndHandleUnitHealth(unit)
 		if err != nil {
 			return nil, err
 		}
 		return unit, nil
 	default:
+		logx.Debugf("在资源池中创建资源")
+
 		//成功创建
 		if unit, err := p.createHealthyUnit(); err == nil {
 			return unit, nil
@@ -287,6 +290,8 @@ func (p *Pool) Get(ctx context.Context) (domain.ResourceUnit, error) {
 
 // Put 负责释放资源
 func (p *Pool) Put(unit domain.ResourceUnit) {
+	logx.Debugf("从资源池中获取资源")
+
 	threading.GoSafe(func() {
 		//检查资源是否正常
 		if err := p.checkAndHandleUnitHealth(unit); err != nil {

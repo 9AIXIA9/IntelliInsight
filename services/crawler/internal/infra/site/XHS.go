@@ -129,9 +129,9 @@ func (X *XHS) ParsePostDetail(html string, includeImages bool) (*proto.PostItem,
 
 	// 解析时间和地点
 	timeAndLocationText := strings.TrimSpace(doc.Find(X.GetTimeAndLocationSelector()).Text())
-	logx.Infof("时间和位置的文本：%v", timeAndLocationText)
+	logx.Debugf("时间和位置的文本：%v", timeAndLocationText)
 	post.PostTime, post.PostLocation = X.ParseTimeAndLocation(timeAndLocationText)
-	logx.Infof("提取的时间和位置：%v + %v", time.Unix(post.PostTime, 0), post.PostLocation)
+	logx.Debugf("提取的时间和位置：%v + %v", time.Unix(post.PostTime, 0), post.PostLocation)
 
 	// 统计数据
 	post.PostLikes = X.ParseNumber(doc.Find(X.GetLikesSelector()).Text())

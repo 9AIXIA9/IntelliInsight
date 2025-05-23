@@ -42,7 +42,7 @@ func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, resourcePool d
 		resourcePool: resourcePool,
 		crawler:      crawler.NewCrawler(),
 		mutex:        sync.RWMutex{},
-		taskChan:     make(chan *domain.Task, conf.WorkQueueSize),
+		taskChan:     make(chan *domain.Task, conf.MaxTaskCacheSize),
 		workerPool:   make(chan struct{}, conf.MaxWorkers),
 		stopChan:     make(chan struct{}),
 		waitGroup:    sync.WaitGroup{},
@@ -172,6 +172,7 @@ func (tq *TaskQueue) AddTask(request *proto.CrawlRequest) (string, error) {
 	// 创建新任务
 	taskID := utils.GenerateID()
 	now := time.Now()
+	logx.Infof("收到任务：%v", taskID)
 
 	task := &domain.Task{
 		ID:             taskID,

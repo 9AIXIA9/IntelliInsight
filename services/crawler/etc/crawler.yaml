@@ -1,4 +1,5 @@
 Name: crawler.rpc
+Mode: ${APP_MODE}
 ListenOn: ${SERVER_LISTEN_ON}
 
 Consul:
@@ -14,6 +15,7 @@ MongoDB:
 TaskQueue:
   WorkQueueSize: ${TASK_QUEUE_WORK_QUEUE_SIZE}
   MaxWorkers: ${TASK_QUEUE_MAX_WORKERS}
+  MaxTaskCacheSize: ${TASK_QUEUE_MAX_CACHE}
 
 Resource:
   DataBasePath: ${RESOURCE_DATA_BASE_PATH}
