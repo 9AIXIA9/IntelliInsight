@@ -1,6 +1,6 @@
 package domain
 
-import "crawler/proto"
+import "time"
 
 // Site 接口定义站点特定的行为和知识
 type Site interface {
@@ -12,24 +12,33 @@ type Site interface {
 	GetPostLinkSelector() string
 	GetPostTitleSelector() string
 	GetPostContentSelector() string
-	GetAuthorSelector() string
-	GetLikesSelector() string
-	GetChatsSelector() string
-	GetCollectsSelector() string
-	GetImagesSelector() string
-	GetTagsSelector() string
+	GetPosterSelector() string
+	GetPostTagsSelector() string
+	GetLikeCountSelector() string
+	GetCommentCountSelector() string
+	GetCollectCountSelector() string
+	GetImageURLSelector() string
 	GetTimeSelector() string
 	GetLocationSelector() string
 
-	ParsePostLinks(html string, minLikes int32) ([]string, error)
-	ParsePostDetail(html string, includeImages bool) (*proto.PostItem, error)
-	ParseComments(html string, count int32, repliesCount int32) ([]*proto.Comment, error)
+	GetCommentItemSelector() string
+	GetCommenterSelector() string
+	GetCommentTimeSelector() string
+	GetCommentLocationSelector() string
+	GetCommentContentSelector() string
+	GetCommentLikeCountSelector() string
+	GetCommentReplyCountSelector() string
 
+	ParsePostLinks(html string, minLikes uint64) ([]string, error)
+	ParsePostPage(html string, includeImages bool) (*Post, error)
+	ParseComments(html string, count uint64, minReplyCount uint64) ([]*Comment, error)
+
+	ParseNumber(numStr string) uint64
 	ParseLocation(locationStr string) string
-	ParseTime(timeStr string) (int64, error)
-	ParseNumber(numStr string) int32
+	ParseTime(timeStr string) (time.Time, error)
 	ParsePostIDFromURL(url string) string
+	ParseCommentID(idStr string) string
 
-	NeedsLogin(html string) bool
+	RequireLogin(html string) bool
 	Login() error
 }

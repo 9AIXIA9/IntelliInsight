@@ -131,7 +131,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 
 	logx.Infof("成功收集到 %d 个帖子链接", len(links))
 
-	posts := make([]*proto.PostItem, 0, len(links))
+	posts := make([]*domain.Post, 0, len(links))
 
 	for i, link := range links {
 		logx.Infof("开始爬取第 %d/%d 个帖子: %s", i+1, len(links), link)
@@ -150,7 +150,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		posts = append(posts, post)
 		task.PostsCollected++
 
-		logx.Infof("成功爬取帖子: %s, 标题: %s", link, post.PostTitle)
+		logx.Infof("成功爬取帖子: %s, 标题: %s", link, post.Title)
 	}
 
 	elapsedTime := time.Since(startTime)

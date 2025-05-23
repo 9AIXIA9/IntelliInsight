@@ -13,7 +13,7 @@
 ## 技术栈
 
 Go服务专注于高效爬取
-Python服务专注于数据展示和分析
+Python服务专注于数据展示
 MongoDB作为中间层实现数据交换
 
 - **Python 端**：
@@ -58,37 +58,81 @@ MongoDB作为中间层实现数据交换
    浏览器实例:IP = 1:1 固定绑定
    资源更换条件: 仅当检测到封禁
 
-## 存储设计
+## 数据模型设计
 
-``` prototext
-// 帖子模型
-message PostItem {
-  string post_id = 1;                 // 帖子ID https://www.xiaohongshu.com/explore/676425e6000000000b0164ab?xsec_token=
-  string title = 2;                   // 标题 --> div.note-content 下的 title
-  string content = 3;                 // 内容 --> note-content 下的 note-text
-  string author = 4;                  // 作者 -->  span.username 选择第一个
-  int32 likes = 5;                    // 点赞数  span.like-wrapper 下的 count
-  int64 post_time = 6;                // 帖子时间戳 class date 今天 07:00 湖南 前半段  处理"今天"、"昨天"等相对时间 1天前 2天前 昨天 17:17 13小时前 03-09 -> 代表今年三月9号 2024-10-25
-  repeated string images = 7;         // 图片URL列表  .div.img-container 下的img
-  repeated Comment comments = 8;      // 评论列表 .div.list-container 下
-  repeated string tags = 9;           // 标签列表 --> div.note-content 下的 desc
-  string location = 10;               // 位置信息 class date 后半段
-  int32 collects = 11;                // 收藏数 span.collect-wrapper 下的 count
-  int32 chats = 12;                   // 评论数 span.chat-wrapper 下的 count
-  string url = 13;                    // 帖子链接 note-item 下的 a href 是绝对路径
+- 存储模型
+
+```go
+package domain
+
+import (
+	"crawler/proto"
+	"time"
+)
+
+//Post 帖子模型
+type Post struct {
+	ID       string
+	Title    string
+	Poster   string
+	Time     time.Time
+	Location string
+	Link     string
+	Content  string
+	Tags     []string
+	
+	LikeCount    uint64
+	CommentCount uint64
+	CollectCount uint64
+	
+	ImageURLs []string
+	Comments  []*Comment
 }
 
-// 评论模型
-// 不用点击评论 自动会出来评论 同样也是无限下滑流的设计
-// replies 自动会浮现第一条回复 点击.div.show-more后就会加载更多回复
-message Comment {
-  string comment_id = 1;            // 评论ID  div.comment-item 的id就是评论id
-  string content = 2;               // 评论内容 content 下的 note-text
-  string author = 3;                // 评论作者 author 但是是一个链接 a 可从中获取名字
-  int32 likes = 4;                  // 评论点赞数 div.like 下的 count
-  int64 comment_time = 5;           // 评论时间戳 date （格式为04-16）
-  string comment_location = 6;      // 评论位置 location （格式为湖南） 可能不存在
-  repeated Comment replies = 7;     // 回复列表 reply-container
-  int32 replies_count = 8;          // 回复数 div.reply 下的 count
+// Comment 评论模型
+type Comment struct {
+	ID        string
+	Commenter string
+	Time      time.Time
+	Location  string
+	Content   string
+	
+	LikeCount  uint64
+	ReplyCount uint64
+	
+	//Replies []*Comment
 }
-```
+
+// 暂时降低难度 暂不实现回复
+//因为回复大部分都是在闲聊 性价比太低了
+//// Reply 回复模型
+//type Reply struct {
+//	ID       string
+//	Replier  string
+//	Time     time.Time
+//	Location string
+//	Content  string
+//
+//	LikeCount uint64
+//}
+
+//Task 爬虫任务模型
+type Task struct {
+	ID             string
+	Request        *proto.CrawlRequest
+	PostsCollected uint32
+	StartTime      time.Time
+	EndTime        time.Time
+	Status         string
+	Err            error
+}
+
+ ```
+
+## 扩展方向
+
+- ~~引入Consul进行服务注册和发现，并实时进行健康检查~~
+- 引入Redis布隆过滤器，对已爬取的页面不再重复爬取
+- 重新设计存储模式，使数据更易懂
+- 扩展Python-APP的交互功能
+

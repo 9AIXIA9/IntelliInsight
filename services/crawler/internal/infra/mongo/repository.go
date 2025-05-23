@@ -5,8 +5,6 @@ import (
 	"crawler/internal/domain"
 	"errors"
 	"github.com/zeromicro/go-zero/core/stores/mon"
-
-	"crawler/proto"
 )
 
 // Repository MongoDB仓库实现
@@ -20,8 +18,10 @@ func NewRepository(postModel *mon.Model, taskModel *mon.Model) domain.Repository
 	return &Repository{postModel: postModel, taskModel: taskModel}
 }
 
+//todo 修改存储方式 添加去重
+
 // SavePosts 保存爬取到的帖子
-func (r *Repository) SavePosts(ctx context.Context, taskID string, posts []*proto.PostItem) error {
+func (r *Repository) SavePosts(ctx context.Context, taskID string, posts []*domain.Post) error {
 	if len(posts) == 0 {
 		return nil
 	}
@@ -44,7 +44,6 @@ func (r *Repository) SaveTasks(ctx context.Context, task *domain.Task) error {
 	if task == nil {
 		return errors.New("任务为空")
 	}
-
 	_, err := r.taskModel.InsertOne(ctx, task)
 	return err
 }

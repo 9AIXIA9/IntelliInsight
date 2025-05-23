@@ -14,10 +14,10 @@ service CrawlerService {
 message CrawlRequest {
   Site site = 1; //爬取站点
   string keyword = 2;                  // 搜索关键词，例如"南昌"
-  int32 post_count = 3;                // 爬取帖子数量
-  int32 min_likes = 4;                 // 最少点赞数筛选
-  int32 comments_per_post = 5;         // 每个帖子爬取的评论数量
-  int32 replies_per_comment = 6;       // 每条评论爬取的回复数量
+  uint64 post_count = 3;                // 爬取帖子数量
+  uint64 min_likes = 4;                 // 最少点赞数筛选
+  uint64 comments_per_post = 5;         // 每个帖子爬取的评论数量
+  uint64 replies_per_comment = 6;       // 每条评论爬取的回复数量
   bool include_comments = 7;           // 是否包含评论
   bool include_images = 8;             // 是否爬取图片URL
 }
@@ -29,47 +29,7 @@ message CrawlResponse {
   string message = 3;                  // 相关信息或错误消息
 }
 
-// 以下为统一数据结构
-
 // 选取爬取站点
 enum Site {
   XIAOHONGSHU = 0; //xiaohongshu
 }
-
-// 帖子模型
-message PostItem {
-  string post_id = 1;                 // 帖子ID https://www.xiaohongshu.com/explore/676425e6000000000b0164ab?xsec_token=
-  string post_title = 2;                   // 标题 --> div.note-content 下的 title
-  string post_author = 3;                  // 作者 -->  span.username 选择第一个
-  int64 post_time = 4;                // 帖子时间戳 class date 今天 07:00 湖南 前半段  处理"今天"、"昨天"等相对时间 1天前 2天前 昨天 17:17 13小时前 03-09 -> 代表今年三月9号 2024-10-25
-  string post_location = 5;               // 位置信息 class date 后半段
-  string post_content = 6;                 // 内容 --> note-content 下的 note-text
-  string post_url = 7;                    // 帖子链接 note-item 下的 a href 是绝对路径
-
-  int32 post_likes = 8;                    // 点赞数  span.like-wrapper 下的 count
-  int32 post_collects = 9;                // 收藏数 span.collect-wrapper 下的 count
-  int32 post_chats = 10;                   // 评论数 span.chat-wrapper 下的 count
-
-  repeated string images = 11;         // 图片URL列表  .div.img-container 下的img
-  repeated string tags = 12;           // 标签列表 --> div.note-content 下的 desc
-  repeated Comment comments = 13;      // 评论列表 .div.list-container 下
-}
-
-// 评论模型
-// 不用点击评论 自动会出来评论 同样也是无限下滑流的设计
-// replies 自动会浮现第一条回复 点击.div.show-more后就会加载更多回复
-message Comment {
-  string comment_id = 1;            // 评论ID  div.comment-item 的id就是评论id
-  string comment_author = 2;                // 评论作者 author 但是是一个链接 a 可从中获取名字
-  string comment_content = 3;               // 评论内容 content 下的 note-text
-
-  int64 comment_time = 4;           // 评论时间戳 date （格式为04-16）
-  string comment_location = 5;      // 评论位置 location （格式为湖南） 可能不存在
-
-  int32 comment_likes = 6;                  // 评论点赞数 div.like 下的 count
-  int32 comment_replies = 7;          // 回复数 div.reply 下的 count
-
-  repeated Comment replies = 8;     // 回复列表 reply-container
-}
-
-

@@ -1,7 +1,7 @@
 package site
 
 import (
-	"crawler/proto"
+	"crawler/internal/domain"
 	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
@@ -43,28 +43,28 @@ func (X *XHS) GetPostContentSelector() string {
 	return ".note-content .note-text"
 }
 
-func (X *XHS) GetAuthorSelector() string {
+func (X *XHS) GetPosterSelector() string {
 	return "span.username"
 }
 
-func (X *XHS) GetLikesSelector() string {
+func (X *XHS) GetPostTagsSelector() string {
+	return "div.note-content .tag"
+}
+
+func (X *XHS) GetLikeCountSelector() string {
 	return "span.like-wrapper .count"
 }
 
-func (X *XHS) GetChatsSelector() string {
+func (X *XHS) GetCommentCountSelector() string {
 	return "span.chat-wrapper .count"
 }
 
-func (X *XHS) GetCollectsSelector() string {
+func (X *XHS) GetCollectCountSelector() string {
 	return "span.collect-wrapper .count"
 }
 
-func (X *XHS) GetImagesSelector() string {
+func (X *XHS) GetImageURLSelector() string {
 	return "div.img-container img"
-}
-
-func (X *XHS) GetTagsSelector() string {
-	return "div.note-content .desc"
 }
 
 func (X *XHS) GetTimeSelector() string {
@@ -79,7 +79,40 @@ func (X *XHS) GetTimeAndLocationSelector() string {
 	return "div.note-content .date"
 }
 
-func (X *XHS) ParsePostLinks(html string, minLikes int32) ([]string, error) {
+func (X *XHS) GetCommentItemSelector() string {
+	return "div.comment-item"
+}
+
+func (X *XHS) GetCommentIDSelector() string {
+	return "id"
+}
+
+func (X *XHS) GetCommenterSelector() string {
+	return ".author"
+}
+
+func (X *XHS) GetCommentTimeSelector() string {
+	return ".info .date"
+}
+
+func (X *XHS) GetCommentLocationSelector() string {
+	return ".info .location"
+}
+
+func (X *XHS) GetCommentContentSelector() string {
+	//".content .note-text"
+	return "span.note-text"
+}
+
+func (X *XHS) GetCommentLikeCountSelector() string {
+	return ".like .count"
+}
+
+func (X *XHS) GetCommentReplyCountSelector() string {
+	return ".reply .count"
+}
+
+func (X *XHS) ParsePostLinks(html string, minLikes uint64) ([]string, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, err
@@ -90,11 +123,11 @@ func (X *XHS) ParsePostLinks(html string, minLikes int32) ([]string, error) {
 
 	doc.Find(X.GetPostCardSelector()).Each(func(i int, s *goquery.Selection) {
 		// 获取帖子点赞数
-		likesText := s.Find(X.GetLikesSelector()).Text()
-		likes := X.ParseNumber(likesText)
+		likesText := s.Find(X.GetLikeCountSelector()).Text()
+		likesNum := X.ParseNumber(likesText)
 
 		// 只收集点赞数达到要求的帖子
-		if likes >= minLikes {
+		if likesNum >= minLikes {
 			if href, exists := s.Find(X.GetPostLinkSelector()).Attr("href"); exists {
 				// 如果是相对路径，添加基础URL
 				if !strings.HasPrefix(href, "http") {
@@ -108,39 +141,37 @@ func (X *XHS) ParsePostLinks(html string, minLikes int32) ([]string, error) {
 	return links, nil
 }
 
-func (X *XHS) ParsePostDetail(html string, includeImages bool) (*proto.PostItem, error) {
+func (X *XHS) ParsePostPage(html string, includeImages bool) (*domain.Post, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, err
 	}
 
-	post := &proto.PostItem{}
+	post := &domain.Post{}
 
 	// 标题 - 处理转义字符
 	title := strings.TrimSpace(doc.Find(X.GetPostTitleSelector()).Text())
-	post.PostTitle = strings.ReplaceAll(title, "\\n", "\n")
+	post.Title = strings.ReplaceAll(title, "\\n", "\n")
 
 	// 内容 - 处理转义字符
 	content := strings.TrimSpace(doc.Find(X.GetPostContentSelector()).Text())
-	post.PostContent = strings.ReplaceAll(content, "\\n", "\n")
+	post.Content = strings.ReplaceAll(content, "\\n", "\n")
 
 	// 作者
-	post.PostAuthor = strings.TrimSpace(doc.Find(X.GetAuthorSelector()).First().Text())
+	post.Poster = strings.TrimSpace(doc.Find(X.GetPosterSelector()).First().Text())
 
 	// 解析时间和地点
 	timeAndLocationText := strings.TrimSpace(doc.Find(X.GetTimeAndLocationSelector()).Text())
-	logx.Debugf("时间和位置的文本：%v", timeAndLocationText)
-	post.PostTime, post.PostLocation = X.ParseTimeAndLocation(timeAndLocationText)
-	logx.Debugf("提取的时间和位置：%v + %v", time.Unix(post.PostTime, 0), post.PostLocation)
+	post.Time, post.Location = X.ParseTimeAndLocation(timeAndLocationText)
 
 	// 统计数据
-	post.PostLikes = X.ParseNumber(doc.Find(X.GetLikesSelector()).Text())
-	post.PostCollects = X.ParseNumber(doc.Find(X.GetCollectsSelector()).Text())
-	post.PostChats = X.ParseNumber(doc.Find(X.GetChatsSelector()).Text())
+	post.LikeCount = X.ParseNumber(doc.Find(X.GetLikeCountSelector()).Text())
+	post.CollectCount = X.ParseNumber(doc.Find(X.GetCollectCountSelector()).Text())
+	post.CommentCount = X.ParseNumber(doc.Find(X.GetCommentCountSelector()).Text())
 
 	// 标签 - 处理转义字符
 	var tags []string
-	doc.Find(X.GetTagsSelector()).Each(func(i int, s *goquery.Selection) {
+	doc.Find(X.GetPostTagsSelector()).Each(func(i int, s *goquery.Selection) {
 		tag := strings.TrimSpace(s.Text())
 		tag = strings.ReplaceAll(tag, "\\n", "\n")
 		if tag != "" && !strings.Contains(tag, "#") {
@@ -153,99 +184,63 @@ func (X *XHS) ParsePostDetail(html string, includeImages bool) (*proto.PostItem,
 	// 图片URL列表（如果需要）
 	if includeImages {
 		var images []string
-		doc.Find(X.GetImagesSelector()).Each(func(i int, s *goquery.Selection) {
+		doc.Find(X.GetImageURLSelector()).Each(func(i int, s *goquery.Selection) {
 			if src, exists := s.Attr("src"); exists {
 				images = append(images, src)
 			} else if dataSrc, exists := s.Attr("data-src"); exists {
 				images = append(images, dataSrc)
 			}
 		})
-		post.Images = images
+		post.ImageURLs = images
 	}
 
 	return post, nil
 }
 
-func (X *XHS) ParseComments(html string, count int32, repliesCount int32) ([]*proto.Comment, error) {
+func (X *XHS) ParseComments(html string, count uint64, minReplyCount uint64) ([]*domain.Comment, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, err
 	}
 
-	var comments []*proto.Comment
+	var comments []*domain.Comment
 	commentCount := 0
 
-	doc.Find("div.comment-item").Each(func(i int, s *goquery.Selection) {
-		if int32(commentCount) >= count {
+	doc.Find(X.GetCommentItemSelector()).Each(func(i int, s *goquery.Selection) {
+		if uint64(commentCount) >= count {
 			return
 		}
 
-		comment := &proto.Comment{}
+		comment := &domain.Comment{}
 
 		// 评论ID
-		if id, exists := s.Attr("id"); exists {
-			comment.CommentId = id
+		// id = comment-681e61ed00000000090169d6 class = comment-item
+		if id, exists := s.Attr(X.GetCommentIDSelector()); exists {
+			comment.ID = X.ParseCommentID(id)
 		}
 
 		// 评论内容
-		comment.CommentContent = strings.TrimSpace(s.Find(".content .note-text").Text())
+		comment.Content = strings.TrimSpace(s.Find(X.GetCommentContentSelector()).Text())
 
 		// 评论作者
-		comment.CommentAuthor = strings.TrimSpace(s.Find(".author").Text())
+		comment.Commenter = strings.TrimSpace(s.Find(X.GetCommenterSelector()).Text())
 
 		// 点赞数
-		comment.CommentLikes = X.ParseNumber(s.Find("div.like .count").Text())
+		comment.LikeCount = X.ParseNumber(s.Find(X.GetCommentLikeCountSelector()).Text())
 
 		// 回复数
-		comment.CommentReplies = X.ParseNumber(s.Find("div.reply .count").Text())
+		comment.ReplyCount = X.ParseNumber(s.Find(X.GetCommentReplyCountSelector()).Text())
 
-		// 评论时间
-		timeText := strings.TrimSpace(s.Find(".date").Text())
-		if commentTime, err := X.ParseTime(timeText); err == nil {
-			comment.CommentTime = commentTime
+		//  评论时间和地点
+		// 小红书上是分开的
+		timeText := strings.TrimSpace(s.Find(X.GetCommentTimeSelector()).Text())
+		comment.Time, err = X.ParseTime(timeText)
+		if err != nil {
+			logx.Errorf("解析评论时间错误：%v，解析内容：%v -> %v", err, timeText, comment.Time)
 		}
 
-		// 评论位置
-		comment.CommentLocation = strings.TrimSpace(s.Find(".location").Text())
-
-		// 解析回复（如果有）
-		if repliesCount > 0 {
-			var replies []*proto.Comment
-			replyCounter := 0
-
-			s.Find(".reply-container .reply-item").Each(func(j int, r *goquery.Selection) {
-				if int32(replyCounter) >= repliesCount {
-					return
-				}
-
-				reply := &proto.Comment{}
-
-				// 回复ID
-				if id, exists := r.Attr("id"); exists {
-					reply.CommentId = id
-				}
-
-				// 回复内容
-				reply.CommentContent = strings.TrimSpace(r.Find(".content .note-text").Text())
-
-				// 回复作者
-				reply.CommentAuthor = strings.TrimSpace(r.Find(".author").Text())
-
-				// 回复点赞
-				reply.CommentLikes = X.ParseNumber(r.Find("div.like .count").Text())
-
-				// 回复时间
-				replyTimeText := strings.TrimSpace(r.Find(".date").Text())
-				if replyTime, err := X.ParseTime(replyTimeText); err == nil {
-					reply.CommentTime = replyTime
-				}
-
-				replies = append(replies, reply)
-				replyCounter++
-			})
-
-			comment.Replies = replies
-		}
+		locationText := strings.TrimSpace(s.Find(X.GetCommentLocationSelector()).Text())
+		comment.Location = X.ParseLocation(locationText)
 
 		comments = append(comments, comment)
 		commentCount++
@@ -254,14 +249,42 @@ func (X *XHS) ParseComments(html string, count int32, repliesCount int32) ([]*pr
 	return comments, nil
 }
 
-func (X *XHS) ParseNumber(numStr string) int32 {
+func (X *XHS) ParsePostIDFromURL(url string) string {
+	// 示例URL: https://www.xiaohongshu.com/explore/681dcb4700000000230155f6?xsec_token=AB61wxogAE0aGV4XXz3xRU7L08DSBxqe14KCT6N8SLzDA=&xsec_source=pc_cfeed
+
+	// 分离查询参数部分
+	parts := strings.Split(url, "?")
+	pathPart := parts[0]
+
+	// 分离路径部分，获取最后一段作为ID
+	pathSegments := strings.Split(pathPart, "/")
+	if len(pathSegments) > 0 {
+		postID := pathSegments[len(pathSegments)-1]
+		return postID
+	}
+
+	return ""
+}
+
+func (X *XHS) ParseCommentID(commentStr string) string {
+	// 提取格式为 "comment-XXXXXXXX" 的评论ID中的数字部分
+	if strings.Contains(commentStr, "comment-") {
+		parts := strings.Split(commentStr, "comment-")
+		if len(parts) > 1 {
+			return parts[1]
+		}
+	}
+	return commentStr
+}
+
+func (X *XHS) ParseNumber(numStr string) uint64 {
 	// 清理字符串，只保留数字
 	re := regexp.MustCompile(`\d+`)
 	matches := re.FindStringSubmatch(numStr)
 	if len(matches) > 0 {
 		num, err := strconv.Atoi(matches[0])
 		if err == nil {
-			return int32(num)
+			return uint64(num)
 		}
 	}
 
@@ -272,7 +295,7 @@ func (X *XHS) ParseNumber(numStr string) int32 {
 		if len(matches) >= 2 {
 			num, err := strconv.ParseFloat(matches[1], 64)
 			if err == nil {
-				return int32(num * 10000)
+				return uint64(num * 10000)
 			}
 		}
 	}
@@ -280,38 +303,28 @@ func (X *XHS) ParseNumber(numStr string) int32 {
 	return 0
 }
 
-func (X *XHS) ParsePostIDFromURL(url string) string {
-	//https://www.xiaohongshu.com/search_result/676425e6000000000b0164ab?xsec_token=
-	re := regexp.MustCompile(`/search_result/([^?]+)`)
-	matches := re.FindStringSubmatch(url)
-	if len(matches) >= 2 {
-		return matches[1]
-	}
-	return ""
-}
-
-func (X *XHS) NeedsLogin(html string) bool {
+func (X *XHS) RequireLogin(html string) bool {
 	return strings.Contains(html, "登录") &&
 		strings.Contains(html, "注册") &&
 		!strings.Contains(html, "退出登录")
 }
 
 func (X *XHS) Login() error {
-	// 实际项目中需要实现登录逻辑
-	// 可能涉及到扫码登录、账号密码登录等
-	// 这里简化处理，返回未实现错误
+	// todo: 扫码登录 或 手机验证码登录
 	return errors.New("登录功能未实现")
 }
 
 // 预编译的正则表达式
 // 格式：
 //
-//	编辑于 6天前 上海
-//	6天前 浙江
-//	05-14 湖北
-//	2024-05-05
-//	昨天 16:27 四川
-//	5小时前 四川
+//		编辑于 6天前 上海
+//		6天前 浙江
+//		05-14 湖北
+//		2024-05-05
+//		昨天 16:27 四川
+//		5小时前 四川
+//	 8分钟前 广东
+//	 刚刚 江西
 var (
 	// 时间相关正则
 	dayAgoRegex        = regexp.MustCompile(`(\d+)天前`)
@@ -322,8 +335,10 @@ var (
 	yesterdayTimeRegex = regexp.MustCompile(`昨天\s+(\d{1,2}):(\d{2})`)
 )
 
-// ParseTimeAndLocation 小红书的location和time放在一起的所以可以一起解析
-func (X *XHS) ParseTimeAndLocation(str string) (timestamp int64, location string) {
+// ParseTimeAndLocation 小红书帖子中的 location 和 time 放在一起的所以可以一起解析
+func (X *XHS) ParseTimeAndLocation(str string) (timex time.Time, location string) {
+	logx.Debugf("时间和位置的文本：%v", str)
+
 	// 清理字符串
 	str = strings.TrimSpace(str)
 	str = strings.TrimPrefix(str, "编辑于")
@@ -335,8 +350,7 @@ func (X *XHS) ParseTimeAndLocation(str string) (timestamp int64, location string
 		month, errM := strconv.Atoi(matches[2])
 		day, errD := strconv.Atoi(matches[3])
 		if errY == nil && errM == nil && errD == nil {
-			date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
-			timestamp = date.Unix()
+			timex = time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
 
 			// 移除日期部分，剩余的才是位置
 			locationStr := yearMonthDayRegex.ReplaceAllString(str, "")
@@ -360,16 +374,11 @@ func (X *XHS) ParseTimeAndLocation(str string) (timestamp int64, location string
 		if len(matches) >= 2 {
 			// 从原字符串中提取时间部分
 			timeStr := matches[0]
-			// 将匹配到的时间字符串转换为Unix时间戳
+			// 将匹配到的时间字符串转换为time.Time
 			parsedTime, err := X.ParseTime(timeStr)
 			if err == nil {
-				timestamp = parsedTime
+				timex = parsedTime
 			}
-
-			// 从原字符串中移除时间部分，剩余的就是位置
-			locationStr := re.ReplaceAllString(str, "")
-			location = strings.TrimSpace(locationStr)
-			return
 		}
 	}
 
@@ -383,15 +392,16 @@ func (X *XHS) ParseTimeAndLocation(str string) (timestamp int64, location string
 			timeStr := strings.Join(parts[:len(parts)-1], " ")
 			parsedTime, err := X.ParseTime(timeStr)
 			if err == nil {
-				timestamp = parsedTime
+				return parsedTime, location
 			}
 		}
 	}
 
+	logx.Debugf("提取的时间和位置：%v + %v", timex, location)
 	return
 }
 
-func (X *XHS) ParseTime(timeStr string) (int64, error) {
+func (X *XHS) ParseTime(timeStr string) (time.Time, error) {
 	now := time.Now()
 
 	// 移除可能存在的"编辑于"前缀
@@ -403,8 +413,7 @@ func (X *XHS) ParseTime(timeStr string) (int64, error) {
 		hour, errH := strconv.Atoi(matches[1])
 		minute, errM := strconv.Atoi(matches[2])
 		if errH == nil && errM == nil {
-			today := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-			return today.Unix(), nil
+			return time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location()), nil
 		}
 	}
 
@@ -413,8 +422,7 @@ func (X *XHS) ParseTime(timeStr string) (int64, error) {
 		hour, errH := strconv.Atoi(matches[1])
 		minute, errM := strconv.Atoi(matches[2])
 		if errH == nil && errM == nil {
-			yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, hour, minute, 0, 0, now.Location())
-			return yesterday.Unix(), nil
+			return time.Date(now.Year(), now.Month(), now.Day()-1, hour, minute, 0, 0, now.Location()), nil
 		}
 	}
 
@@ -422,8 +430,7 @@ func (X *XHS) ParseTime(timeStr string) (int64, error) {
 	if matches := dayAgoRegex.FindStringSubmatch(timeStr); len(matches) == 2 {
 		days, err := strconv.Atoi(matches[1])
 		if err == nil {
-			daysAgo := time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location())
-			return daysAgo.Unix(), nil
+			return time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location()), nil
 		}
 	}
 
@@ -431,8 +438,7 @@ func (X *XHS) ParseTime(timeStr string) (int64, error) {
 	if matches := hourAgoRegex.FindStringSubmatch(timeStr); len(matches) == 2 {
 		hours, err := strconv.Atoi(matches[1])
 		if err == nil {
-			hoursAgo := now.Add(time.Duration(-hours) * time.Hour)
-			return hoursAgo.Unix(), nil
+			return now.Add(time.Duration(-hours) * time.Hour), nil
 		}
 	}
 
@@ -442,8 +448,7 @@ func (X *XHS) ParseTime(timeStr string) (int64, error) {
 		month, errM := strconv.Atoi(matches[2])
 		day, errD := strconv.Atoi(matches[3])
 		if errY == nil && errM == nil && errD == nil {
-			date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, now.Location())
-			return date.Unix(), nil
+			return time.Date(year, time.Month(month), day, 0, 0, 0, 0, now.Location()), nil
 		}
 	}
 
@@ -458,13 +463,12 @@ func (X *XHS) ParseTime(timeStr string) (int64, error) {
 			if date.After(now) {
 				date = time.Date(now.Year()-1, time.Month(month), day, 0, 0, 0, 0, now.Location())
 			}
-			return date.Unix(), nil
+			return date, nil
 		}
 	}
 
-	return 0, fmt.Errorf("无法解析时间格式: %s", timeStr)
+	return time.Time{}, fmt.Errorf("无法解析时间格式: %s", timeStr)
 }
-
 func (X *XHS) ParseLocation(locationStr string) string {
 	// 清理字符串
 	locationStr = strings.TrimSpace(locationStr)

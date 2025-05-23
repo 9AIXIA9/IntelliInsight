@@ -3,7 +3,6 @@ package crawler
 import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/utils"
-	"crawler/proto"
 	"errors"
 	"fmt"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -22,7 +21,7 @@ func NewCrawler() domain.Crawler {
 	return &Crawler{}
 }
 
-func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, keyword string, count int32, minLikes int32) ([]string, error) {
+func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, keyword string, count uint64, minLikes uint64) ([]string, error) {
 	//导航到搜索页面
 	searchURL := site.GetSearchURL(keyword)
 
@@ -36,7 +35,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 
 	//检查是否需要登录
 	content := browser.GetPageContent()
-	if site.NeedsLogin(content) {
+	if site.RequireLogin(content) {
 		logx.Infof("%v需要登录", site.GetName())
 
 		if err = site.Login(); err != nil {
@@ -66,7 +65,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 				links = append(links, link)
 			}
 
-			if int32(len(links)) >= count {
+			if uint64(len(links)) >= count {
 				return links[:count], nil
 			}
 		}
@@ -88,7 +87,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 	return nil, errors.New("次数过多")
 }
 
-func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, postURL string, opts ...*domain.CollectPostDetailOption) (*proto.PostItem, error) {
+func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, postLink string, opts ...*domain.CollectPostDetailOption) (*domain.Post, error) {
 	// 处理默认选项
 	var opt *domain.CollectPostDetailOption
 	if len(opts) > 0 {
@@ -97,7 +96,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		opt = (&domain.CollectPostDetailOption{}).WithDefault()
 	}
 
-	err := browser.Navigate(postURL)
+	err := browser.Navigate(postLink)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +105,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 	utils.DelayRandomly(6000)
 
 	content := browser.GetPageContent()
-	if site.NeedsLogin(content) {
+	if site.RequireLogin(content) {
 		logx.Infof("%v需要登录", site.GetName())
 
 		if err = site.Login(); err != nil {
@@ -119,13 +118,12 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 	}
 
 	//基础信息
-	post, err := site.ParsePostDetail(content, opt.IncludeImages)
+	post, err := site.ParsePostPage(content, opt.IncludeImages)
 	if err != nil {
 		return nil, err
 	}
 
-	post.PostId = site.ParsePostIDFromURL(postURL)
-	post.PostUrl = postURL
+	post.Link = postLink
 
 	//获取评论及回复
 	if opt.IncludeComments {
@@ -136,6 +134,8 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		}
 		post.Comments = comments
 	}
+
+	post.ID = site.ParsePostIDFromURL(postLink)
 
 	logx.Infof("帖子:%v", post)
 

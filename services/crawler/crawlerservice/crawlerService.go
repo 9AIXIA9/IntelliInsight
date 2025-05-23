@@ -14,10 +14,8 @@ import (
 )
 
 type (
-	Comment       = proto.Comment
 	CrawlRequest  = proto.CrawlRequest
 	CrawlResponse = proto.CrawlResponse
-	PostItem      = proto.PostItem
 
 	CrawlerService interface {
 		// 启动爬虫任务

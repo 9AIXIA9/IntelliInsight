@@ -2,6 +2,10 @@ Name: crawler.rpc
 Mode: ${APP_MODE}
 ListenOn: ${SERVER_LISTEN_ON}
 
+Log:
+  Mode: ${LOG_MODE}  # 可选 file, console, volume
+  Level: ${LOG_LEVEL}   # 日志级别：info, error, severe, fatal, debug
+
 Consul:
   Host: ${CONSUL_HOST}
   Key: ${CONSUL_SERVICE_KEY}
