@@ -25,9 +25,10 @@ type Site interface {
 	ParsePostDetail(html string, includeImages bool) (*proto.PostItem, error)
 	ParseComments(html string, count int32, repliesCount int32) ([]*proto.Comment, error)
 
+	ParseLocation(locationStr string) string
 	ParseTime(timeStr string) (int64, error)
 	ParseNumber(numStr string) int32
-	FormatPostID(url string) string
+	ParsePostIDFromURL(url string) string
 
 	NeedsLogin(html string) bool
 	Login() error

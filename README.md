@@ -60,52 +60,35 @@ MongoDB作为中间层实现数据交换
 
 ## 存储设计
 
-```api
-type Task struct {
-    ID string `bson:"_id"`
-    Keyword string `bson:"keyword"`
-    PostCount int32 `bson:"post_count"`
-    IncludeComments bool `bson:"include_comments"`
-    MinLikes int32 `bson:"min_likes"`
-    CommentsPerPost int32 `bson:"comments_per_post"`
-    RepliesPerComment int32 `bson:"replies_per_comment"`
-    IncludeImages bool `bson:"include_images"`
-    Status proto.TaskStatus `bson:"status"`
-    Progress float32 `bson:"progress"`
-    ItemsCollected int32 `bson:"items_collected"`
-    CommentsCollected int32 `bson:"comments_collected"`
-    RepliesCollected int32 `bson:"replies_collected"`
-    Message string `bson:"message"`
-    StartTime time.Time `bson:"start_time"`
-    EndTime time.Time `bson:"end_time,omitempty"`
-    ErrorMessage string `bson:"error_message,omitempty"`
-    ElapsedTime int64 `bson:"elapsed_time"` // 单位：秒
+``` prototext
+// 帖子模型
+message PostItem {
+  string post_id = 1;                 // 帖子ID https://www.xiaohongshu.com/explore/676425e6000000000b0164ab?xsec_token=
+  string title = 2;                   // 标题 --> div.note-content 下的 title
+  string content = 3;                 // 内容 --> note-content 下的 note-text
+  string author = 4;                  // 作者 -->  span.username 选择第一个
+  int32 likes = 5;                    // 点赞数  span.like-wrapper 下的 count
+  int64 post_time = 6;                // 帖子时间戳 class date 今天 07:00 湖南 前半段  处理"今天"、"昨天"等相对时间 1天前 2天前 昨天 17:17 13小时前 03-09 -> 代表今年三月9号 2024-10-25
+  repeated string images = 7;         // 图片URL列表  .div.img-container 下的img
+  repeated Comment comments = 8;      // 评论列表 .div.list-container 下
+  repeated string tags = 9;           // 标签列表 --> div.note-content 下的 desc
+  string location = 10;               // 位置信息 class date 后半段
+  int32 collects = 11;                // 收藏数 span.collect-wrapper 下的 count
+  int32 chats = 12;                   // 评论数 span.chat-wrapper 下的 count
+  string url = 13;                    // 帖子链接 note-item 下的 a href 是绝对路径
 }
 
-type PostItem struct {
-    PostId string                       // 帖子ID
-    Title string                        // 标题 --> div.note-content 下的 title
-    Content string                      // 内容 --> note-content 下的 note-text
-    Author string                       // 作者 -->  span.username 选择第一个
-    Likes string                        // 点赞数  span.like-wrapper 下的 count
-    PublishTime int64                   // 发布时间戳 class date 今天 07:00 湖南 前半段
-    Images []string                     // 图片URL列表  .div.img-container 下的img
-    Comments []*Comment                 // 评论列表 .div.list-container 下
-    Tags []string                       // 标签列表 --> div.note-content 下的 desc
-    Location string                     // 位置信息 class date 后半段
-    Collects string                     // 收藏数 span.collect-wrapper 下的 count
-    Chats string                        // 评论数 span.chat-wrapper 下的 count
+// 评论模型
+// 不用点击评论 自动会出来评论 同样也是无限下滑流的设计
+// replies 自动会浮现第一条回复 点击.div.show-more后就会加载更多回复
+message Comment {
+  string comment_id = 1;            // 评论ID  div.comment-item 的id就是评论id
+  string content = 2;               // 评论内容 content 下的 note-text
+  string author = 3;                // 评论作者 author 但是是一个链接 a 可从中获取名字
+  int32 likes = 4;                  // 评论点赞数 div.like 下的 count
+  int64 comment_time = 5;           // 评论时间戳 date （格式为04-16）
+  string comment_location = 6;      // 评论位置 location （格式为湖南） 可能不存在
+  repeated Comment replies = 7;     // 回复列表 reply-container
+  int32 replies_count = 8;          // 回复数 div.reply 下的 count
 }
-
-type Comment struct {
-    CommentId string                        // 评论ID class comment-item 的id就是评论id
-    Content string                          // 评论内容 content 下的 note-text
-    Author string                           // 评论作者 author 但是是一个链接 a 可从中获取名字
-    Likes string                            // 评论点赞数 like 下的 count
-    CommentTime int64                       // 评论时间戳 date （格式为04-16）
-    CommentLocation string                  // 评论位置 location （格式为湖南） 可能不存在
-    Replies []*Comment                      // 回复列表 reply-container
-    RepliesCount string                     // 回复数 reply 下的 count
-}
-
 ```

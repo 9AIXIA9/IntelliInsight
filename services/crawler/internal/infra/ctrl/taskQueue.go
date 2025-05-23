@@ -150,7 +150,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		posts = append(posts, post)
 		task.PostsCollected++
 
-		logx.Infof("成功爬取帖子: %s, 标题: %s", link, post.Title)
+		logx.Infof("成功爬取帖子: %s, 标题: %s", link, post.PostTitle)
 	}
 
 	elapsedTime := time.Since(startTime)

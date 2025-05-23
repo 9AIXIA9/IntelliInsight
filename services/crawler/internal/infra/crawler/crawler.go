@@ -124,8 +124,8 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		return nil, err
 	}
 
-	post.PostId = site.FormatPostID(postURL)
-	post.Url = postURL
+	post.PostId = site.ParsePostIDFromURL(postURL)
+	post.PostUrl = postURL
 
 	//获取评论及回复
 	if opt.IncludeComments {
