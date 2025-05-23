@@ -51,15 +51,24 @@ class CrawlerClient:
         if self._channel is None:
             try:
                 logger.info(f"连接爬虫服务: {self.config.address}")
-                self._channel = grpc.insecure_channel(self.config.address)
+                # 使用正确的格式和选项
+                address = self.config.address.replace('localhost', '127.0.0.1')
+                options = [
+                    ('grpc.so_reuseport', 0),
+                    ('grpc.use_local_subchannel_pool', 1),
+                    ('grpc.keepalive_time_ms', 30000),
+                    ('grpc.keepalive_timeout_ms', 10000),
+                    ('grpc.keepalive_permit_without_calls', 1)
+                ]
+                self._channel = grpc.insecure_channel(address)
                 self._stub = crawler_pb2_grpc.CrawlerServiceStub(self._channel)
-
-                # 验证stub是否成功创建
-                if self._stub is None:
-                    logger.error("创建gRPC stub失败")
-                    raise RuntimeError("创建gRPC stub失败")
-
-                logger.info("爬虫服务连接成功")
+                # 检查通道状态
+                try:
+                    state = self._channel._channel.check_connectivity_state(True)
+                    logger.info(f"爬虫服务连接状态: {state}")
+                    logger.info("爬虫服务连接成功")
+                except Exception as e:
+                    logger.warning(f"连接状态检查失败: {e}")
             except Exception as e:
                 logger.error(f"连接爬虫服务失败: {str(e)}")
                 self._channel = None
@@ -95,12 +104,15 @@ class CrawlerClient:
         for attempt in range(self.config.max_retries):
             try:
                 return func(*args, **kwargs)
+
             except grpc.RpcError as e:
                 last_exception = e
                 logger.warning(f"RPC调用失败 (尝试 {attempt + 1}/{self.config.max_retries}): {str(e)}")
 
                 # 连接错误时重新连接
-                if e.code() in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
+                # 使用安全的方式检查状态码
+                status_code = e.code() if hasattr(e, 'code') else None
+                if status_code in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
                     self.close()
                     self.connect()
 
@@ -135,7 +147,7 @@ class CrawlerClient:
             包含任务ID、成功状态和消息的字典
         """
         request = crawler_pb2.CrawlRequest(
-            site=site,  # 添加site参数
+            site=site,
             keyword=keyword,
             post_count=post_count,
             include_comments=include_comments,
