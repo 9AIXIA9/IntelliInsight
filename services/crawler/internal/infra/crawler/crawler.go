@@ -35,7 +35,12 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 
 	//检查是否需要登录
 	content := browser.GetPageContent()
-	if site.RequireLogin(content) {
+	require, err := site.RequireLogin(content)
+	if err != nil {
+		return nil, err
+	}
+
+	if require {
 		logx.Infof("%v需要登录", site.GetName())
 
 		if err = site.Login(); err != nil {
@@ -105,7 +110,12 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 	utils.DelayRandomly(6000)
 
 	content := browser.GetPageContent()
-	if site.RequireLogin(content) {
+	require, err := site.RequireLogin(content)
+	if err != nil {
+		return nil, err
+	}
+
+	if require {
 		logx.Infof("%v需要登录", site.GetName())
 
 		if err = site.Login(); err != nil {

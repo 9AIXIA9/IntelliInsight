@@ -39,6 +39,6 @@ type Site interface {
 	ParsePostIDFromURL(url string) string
 	ParseCommentID(idStr string) string
 
-	RequireLogin(html string) bool
+	RequireLogin(html string) (bool, error)
 	Login() error
 }

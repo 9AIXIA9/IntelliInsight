@@ -14,6 +14,9 @@ import (
 	"time"
 )
 
+// 检查是否实现 domain.Site
+var _ domain.Site = &XHS{}
+
 type XHS struct{}
 
 func (X *XHS) GetName() string {
@@ -401,13 +404,19 @@ func (X *XHS) ParseNumber(numStr string) uint64 {
 	return 0
 }
 
-func (X *XHS) RequireLogin(html string) bool {
-	return strings.Contains(html, "登录") &&
-		strings.Contains(html, "注册") &&
-		!strings.Contains(html, "退出登录")
+func (X *XHS) RequireLogin(html string) (bool, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+
+		return false, fmt.Errorf("解析HTML文档失败: %w", err)
+	}
+
+	// 检查是否存在登录容器元素
+	return doc.Find(".login-container").Length() > 0, nil
 }
 
 func (X *XHS) Login() error {
 	// todo: 扫码登录 或 手机验证码登录
+	logx.Infof("未实现登录逻辑")
 	return errors.New("登录功能未实现")
 }
