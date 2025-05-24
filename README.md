@@ -8,6 +8,7 @@
 - **爬虫核心**：Go 服务
 - **通信方式**：gRPC
 - **数据存储**：MongoDB
+- **数据过滤**：Redis
 - **服务发现与注册**：Consul
 
 ## 技术栈
@@ -18,15 +19,14 @@ MongoDB作为中间层实现数据交换
 
 - **Python 端**：
 - FastAPI 框架
-- Motor (异步 MongoDB 驱动)
 - gRPC 客户端
-- Pydantic 数据验证
 - Uvicorn 服务器
-- 基础爬虫（降级方案）
 
 - **Go 端**：
-- 高性能爬虫核心
+- 高性能并发爬虫核心
 - gRPC 服务端
+- MongoDB数据存储
+- Redis布隆过滤器过滤数据
 
 ## 系统特点
 
@@ -38,15 +38,66 @@ MongoDB作为中间层实现数据交换
 ## 主要功能
 
 1. 创建爬虫任务：指定关键词、页数等参数
-2. 查询爬虫状态：实时监控爬虫进度
-3. 获取爬取数据：分页查询
-4. 智能数据分析
-5. 降级方案（当gRPC服务不可用时，使用降级方案保证系统的可用性）
-6. 去重防止爬取相同内容（布隆过滤器）
+2. 降级方案（当gRPC服务不可用时，使用降级方案保证系统的可用性）
+3. 去重防止爬取相同内容（布隆过滤器）
 
 ## 爬虫设计
 
-1. 分析解构小红书网页组成，抽象成数据结构（protobuf文件）
+1. 分析解构小红书网页组成，整理成数据结构（domain文件）
+
+   ```go
+   package domain
+   
+   import "time"
+   
+   // Post 帖子模型
+   type Post struct {
+	   ID       string    `bson:"_id"`
+	   TaskID   string    `bson:"task_id"`
+	   Title    string    `bson:"title"`
+	   Poster   string    `bson:"poster"`
+	   Time     time.Time `bson:"time"`
+	   Location string    `bson:"location"`
+	   Link     string    `bson:"link"`
+	   Content  string    `bson:"content"`
+	   Tags     []string  `bson:"tags"`
+	   
+	   LikeCount    uint64 `bson:"like_count"`
+	   CommentCount uint64 `bson:"comment_count"`
+	   CollectCount uint64 `bson:"collect_count"`
+	   
+	   ImageURLs []string   `bson:"image_urls"`
+	   Comments  []*Comment `bson:"comments"`
+   }
+   
+   // Comment 评论模型
+   type Comment struct {
+	   ID        string    `bson:"_id"`
+	   Commenter string    `bson:"commenter"`
+	   Time      time.Time `bson:"time"`
+	   Location  string    `bson:"location"`
+	   Content   string    `bson:"content"`
+	   
+	   LikeCount  uint64 `bson:"like_count"`
+	   ReplyCount uint64 `bson:"reply_count"`
+	   
+	   //Replies []*Comment
+   
+   }
+   
+   // 暂时降低难度 暂不实现回复
+   //因为回复大部分都是在闲聊 性价比太低了
+   //// Reply 回复模型
+   //type Reply struct {
+   // ID string
+   // Replier string
+   // Time time.Time
+   // Location string
+   // Content string
+   //
+   // LikeCount uint64
+   //}
+   ```
 
 2. 并发爬虫设计：
 	- 优势：当sleep或者阻塞时（尤其在反爬机制实现时，go能够高效并发，所以适合做并发爬虫），及时让出CPU以及其余资源的占有，提高资源利用率
@@ -58,82 +109,11 @@ MongoDB作为中间层实现数据交换
    浏览器实例:IP = 1:1 固定绑定
    资源更换条件: 仅当检测到封禁
 
-## 数据模型设计
-
-- 存储模型
-
-```go
-package domain
-
-import (
-	"crawler/proto"
-	"time"
-)
-
-//Post 帖子模型
-type Post struct {
-	ID       string
-	Title    string
-	Poster   string
-	Time     time.Time
-	Location string
-	Link     string
-	Content  string
-	Tags     []string
-	
-	LikeCount    uint64
-	CommentCount uint64
-	CollectCount uint64
-	
-	ImageURLs []string
-	Comments  []*Comment
-}
-
-// Comment 评论模型
-type Comment struct {
-	ID        string
-	Commenter string
-	Time      time.Time
-	Location  string
-	Content   string
-	
-	LikeCount  uint64
-	ReplyCount uint64
-	
-	//Replies []*Comment
-}
-
-// 暂时降低难度 暂不实现回复
-//因为回复大部分都是在闲聊 性价比太低了
-//// Reply 回复模型
-//type Reply struct {
-//	ID       string
-//	Replier  string
-//	Time     time.Time
-//	Location string
-//	Content  string
-//
-//	LikeCount uint64
-//}
-
-//Task 爬虫任务模型
-type Task struct {
-	ID             string
-	Request        *proto.CrawlRequest
-	PostsCollected uint32
-	StartTime      time.Time
-	EndTime        time.Time
-	Status         string
-	Err            error
-}
-
- ```
-
 ## 扩展方向
 
 - ~~引入Consul进行服务注册和发现，并实时进行健康检查~~
-- 引入Redis布隆过滤器，对已爬取的页面不再重复爬取
-- 重新设计存储模式，使数据更易懂
+- ~~引入Redis布隆过滤器，对已爬取的页面不再重复爬取~~
+- ~~重新设计存储模式，发挥MongoDB的特性（横向扩展）~~
 - 扩展Python-APP的交互功能
 - 完成手机验证码自动登录
 
