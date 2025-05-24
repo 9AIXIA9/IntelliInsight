@@ -2,6 +2,7 @@ package config
 
 import (
 	"crawler/internal/domain"
+	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/zrpc"
 	"github.com/zeromicro/zero-contrib/zrpc/registry/consul"
 	"time"
@@ -10,13 +11,19 @@ import (
 type Config struct {
 	zrpc.RpcServerConf
 
-	MongoDB MongoDB
-
 	Consul consul.Conf
+
+	Redisx redis.RedisConf
+
+	MongoDB MongoDB
 
 	TaskQueue TaskQueue
 
 	Resource Resource
+
+	BloomFilter BloomFilter
+
+	SnowflakeID SnowflakeID
 }
 
 type MongoDB struct {
@@ -25,6 +32,7 @@ type MongoDB struct {
 	PostCollection string
 	TaskCollection string
 }
+
 type TaskQueue struct {
 	WorkQueueSize    int
 	MaxWorkers       int
@@ -42,4 +50,14 @@ type Resource struct {
 	Headless              bool                         //是否开启可视化
 	HealthCheckInterval   time.Duration                //健康检查间隔
 	LoadBalancingStrategy domain.LoadBalancingStrategy //负载均衡策略
+}
+
+type BloomFilter struct {
+	Bits uint
+	Key  string
+}
+
+type SnowflakeID struct {
+	StartTime   time.Time
+	MachineNode int64
 }

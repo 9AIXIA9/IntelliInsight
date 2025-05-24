@@ -29,7 +29,7 @@ type Site interface {
 	GetCommentLikeCountSelector() string
 	GetCommentReplyCountSelector() string
 
-	ParsePostLinks(html string, minLikes uint64) ([]string, error)
+	ParsePostLinks(html string, filter Filter, minLikes uint64) ([]string, error)
 	ParsePostPage(html string, includeImages bool) (*Post, error)
 	ParseComments(html string, count uint64, minReplyCount uint64) ([]*Comment, error)
 

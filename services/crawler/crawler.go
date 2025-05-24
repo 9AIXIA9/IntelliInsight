@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crawler/internal/control"
+	"crawler/internal/infra/utils/snowflake"
 	"flag"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/zero-contrib/zrpc/registry/consul"
@@ -31,6 +32,8 @@ func main() {
 	var c config.Config
 	conf.MustLoad(*configFile, &c, conf.UseEnv())
 	ctx := svc.MustNewServiceContext(&c)
+
+	snowflake.MustInit(c.SnowflakeID.StartTime, c.SnowflakeID.MachineNode)
 
 	s := zrpc.MustNewServer(c.RpcServerConf, func(grpcServer *grpc.Server) {
 		proto.RegisterCrawlerServiceServer(grpcServer, server.NewCrawlerServiceServer(ctx))

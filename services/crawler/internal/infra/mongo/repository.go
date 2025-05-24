@@ -4,21 +4,24 @@ import (
 	"context"
 	"crawler/internal/domain"
 	"errors"
-	"github.com/zeromicro/go-zero/core/stores/mon"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Repository MongoDB仓库实现
 type Repository struct {
-	postModel *mon.Model
-	taskModel *mon.Model
+	postCollection *mongo.Collection
+	taskCollection *mongo.Collection
 }
 
 // NewRepository 创建MongoDB仓库实例
-func NewRepository(postModel *mon.Model, taskModel *mon.Model) domain.Repository {
-	return &Repository{postModel: postModel, taskModel: taskModel}
+func NewRepository(client *mongo.Client, database string, postCollection, taskCollection string) domain.Repository {
+	db := client.Database(database)
+	return &Repository{
+		postCollection: db.Collection(postCollection),
+		taskCollection: db.Collection(taskCollection),
+	}
 }
-
-//todo 修改存储方式 添加去重
 
 // SavePosts 保存爬取到的帖子
 func (r *Repository) SavePosts(ctx context.Context, taskID string, posts []*domain.Post) error {
@@ -26,24 +29,33 @@ func (r *Repository) SavePosts(ctx context.Context, taskID string, posts []*doma
 		return nil
 	}
 
-	// 为每个帖子添加任务ID
 	var documents []interface{}
 	for _, post := range posts {
-		doc := map[string]interface{}{
-			"task_id": taskID,
-			"post":    post,
+		// 检查是否已存在(去重)
+		filter := bson.M{"_id": post.ID}
+		count, err := r.postCollection.CountDocuments(ctx, filter)
+		if err != nil {
+			return err
 		}
-		documents = append(documents, doc)
+
+		if count == 0 {
+			// 确保每个post都有关联的taskID
+			post.TaskID = taskID
+			documents = append(documents, post)
+		}
 	}
 
-	_, err := r.postModel.InsertMany(ctx, documents)
-	return err
+	if len(documents) > 0 {
+		_, err := r.postCollection.InsertMany(ctx, documents)
+		return err
+	}
+	return nil
 }
 
 func (r *Repository) SaveTasks(ctx context.Context, task *domain.Task) error {
 	if task == nil {
 		return errors.New("任务为空")
 	}
-	_, err := r.taskModel.InsertOne(ctx, task)
+	_, err := r.taskCollection.InsertOne(ctx, task)
 	return err
 }

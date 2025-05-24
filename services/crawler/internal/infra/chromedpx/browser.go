@@ -21,7 +21,7 @@ type Browser struct {
 func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) (domain.Browser, error) {
 	parentCtx := context.Background()
 
-	logx.Infof("初始化浏览器: 数据目录=%s, 代理IP=%s", dataDir, ip)
+	logx.Debugf("初始化浏览器: 数据目录=%s, 代理IP=%s", dataDir, ip)
 
 	// 确保数据目录存在
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
@@ -47,7 +47,7 @@ func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHead
 		cancelFunc: func() {
 			browserCancel() // 先取消浏览器上下文
 			cancel()        // 再取消分配器上下文
-			logx.Info("浏览器实例已关闭")
+			logx.Debugf("浏览器实例已关闭")
 		},
 		fingerPrint: fingerPrint,
 		execPath:    browserPath,

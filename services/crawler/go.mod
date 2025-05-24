@@ -4,10 +4,12 @@ go 1.24.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
+	github.com/bwmarrin/snowflake v0.3.0
 	github.com/chromedp/chromedp v0.13.6
 	github.com/joho/godotenv v1.5.1
 	github.com/zeromicro/go-zero v1.8.3
 	github.com/zeromicro/zero-contrib/zrpc/registry/consul v0.0.0-20231030135404-af9ae855016f
+	go.mongodb.org/mongo-driver v1.17.3
 	google.golang.org/grpc v1.72.1
 	google.golang.org/protobuf v1.36.6
 )
@@ -80,7 +82,6 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.15 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.15 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.15 // indirect
-	go.mongodb.org/mongo-driver v1.17.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect

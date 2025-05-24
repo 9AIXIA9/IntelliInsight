@@ -7,13 +7,13 @@ import (
 
 // Task 爬虫任务模型
 type Task struct {
-	ID             string
-	Request        *proto.CrawlRequest
-	PostsCollected uint32
-	StartTime      time.Time
-	EndTime        time.Time
-	Status         string
-	Err            error
+	ID             string              `bson:"_id"`
+	Request        *proto.CrawlRequest `bson:"request"`
+	PostsCollected uint32              `bson:"posts_collected"`
+	StartTime      time.Time           `bson:"start_time"`
+	EndTime        time.Time           `bson:"end_time"`
+	Status         string              `bson:"status"`
+	Err            error               `bson:"err,omitempty"`
 }
 
 // TaskStatus 任务状态

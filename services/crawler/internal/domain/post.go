@@ -6,33 +6,34 @@ import (
 
 // Post 帖子模型
 type Post struct {
-	ID       string
-	Title    string
-	Poster   string
-	Time     time.Time
-	Location string
-	Link     string
-	Content  string
-	Tags     []string
+	ID       string    `bson:"_id"`
+	TaskID   string    `bson:"task_id"`
+	Title    string    `bson:"title"`
+	Poster   string    `bson:"poster"`
+	Time     time.Time `bson:"time"`
+	Location string    `bson:"location"`
+	Link     string    `bson:"link"`
+	Content  string    `bson:"content"`
+	Tags     []string  `bson:"tags"`
 
-	LikeCount    uint64
-	CommentCount uint64
-	CollectCount uint64
+	LikeCount    uint64 `bson:"like_count"`
+	CommentCount uint64 `bson:"comment_count"`
+	CollectCount uint64 `bson:"collect_count"`
 
-	ImageURLs []string
-	Comments  []*Comment
+	ImageURLs []string   `bson:"image_urls"`
+	Comments  []*Comment `bson:"comments"`
 }
 
 // Comment 评论模型
 type Comment struct {
-	ID        string
-	Commenter string
-	Time      time.Time
-	Location  string
-	Content   string
+	ID        string    `bson:"_id"`
+	Commenter string    `bson:"commenter"`
+	Time      time.Time `bson:"time"`
+	Location  string    `bson:"location"`
+	Content   string    `bson:"content"`
 
-	LikeCount  uint64
-	ReplyCount uint64
+	LikeCount  uint64 `bson:"like_count"`
+	ReplyCount uint64 `bson:"reply_count"`
 
 	//Replies []*Comment
 }

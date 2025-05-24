@@ -1,6 +1,7 @@
 package site
 
 import (
+	"context"
 	"crawler/internal/domain"
 	"errors"
 	"fmt"
@@ -52,15 +53,15 @@ func (X *XHS) GetPostTagsSelector() string {
 }
 
 func (X *XHS) GetLikeCountSelector() string {
-	return "span.like-wrapper .count"
+	return ".engage-bar-style .like-wrapper .count"
 }
 
 func (X *XHS) GetCommentCountSelector() string {
-	return "span.chat-wrapper .count"
+	return ".engage-bar-style .chat-wrapper .count"
 }
 
 func (X *XHS) GetCollectCountSelector() string {
-	return "span.collect-wrapper .count"
+	return ".engage-bar-style .collect-wrapper .count"
 }
 
 func (X *XHS) GetImageURLSelector() string {
@@ -96,7 +97,7 @@ func (X *XHS) GetCommentTimeSelector() string {
 }
 
 func (X *XHS) GetCommentLocationSelector() string {
-	return ".info .location"
+	return ".info .date .location"
 }
 
 func (X *XHS) GetCommentContentSelector() string {
@@ -112,10 +113,10 @@ func (X *XHS) GetCommentReplyCountSelector() string {
 	return ".reply .count"
 }
 
-func (X *XHS) ParsePostLinks(html string, minLikes uint64) ([]string, error) {
+func (X *XHS) ParsePostLinks(html string, filter domain.Filter, minLikes uint64) ([]string, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("解析HTML文档失败: %w", err)
 	}
 
 	links := make([]string, 0)
@@ -127,20 +128,46 @@ func (X *XHS) ParsePostLinks(html string, minLikes uint64) ([]string, error) {
 		likesNum := X.ParseNumber(likesText)
 
 		// 只收集点赞数达到要求的帖子
-		if likesNum >= minLikes {
-			if href, exists := s.Find(X.GetPostLinkSelector()).Attr("href"); exists {
-				// 如果是相对路径，添加基础URL
-				if !strings.HasPrefix(href, "http") {
-					href = baseURL + href
-				}
-				links = append(links, href)
+		if likesNum < minLikes {
+			logx.Debugf("点赞数量过少跳过帖子")
+			return
+		}
+
+		href, exists := s.Find(X.GetPostLinkSelector()).Attr("href")
+		if !exists {
+			return
+		}
+
+		// 如果是相对路径，添加基础URL
+		if !strings.HasPrefix(href, "http") {
+			href = baseURL + href
+		}
+
+		// 去重过滤
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		exist, err := filter.ExistsCtx(ctx, []byte(href))
+		if err != nil {
+			logx.Errorf("检查帖子是否被爬取失败：%v", err)
+			return
+		}
+
+		if !exist {
+			links = append(links, href)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			if err := filter.AddCtx(ctx, []byte(href)); err != nil {
+				logx.Errorf("添加帖子到过滤器失败：%v", err)
 			}
 		}
+
+		logx.Debugf("存在帖子已跳过")
 	})
 
 	return links, nil
 }
-
 func (X *XHS) ParsePostPage(html string, includeImages bool) (*domain.Post, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -231,16 +258,9 @@ func (X *XHS) ParseComments(html string, count uint64, minReplyCount uint64) ([]
 		// 回复数
 		comment.ReplyCount = X.ParseNumber(s.Find(X.GetCommentReplyCountSelector()).Text())
 
-		//  评论时间和地点
-		// 小红书上是分开的
-		timeText := strings.TrimSpace(s.Find(X.GetCommentTimeSelector()).Text())
-		comment.Time, err = X.ParseTime(timeText)
-		if err != nil {
-			logx.Errorf("解析评论时间错误：%v，解析内容：%v -> %v", err, timeText, comment.Time)
-		}
-
-		locationText := strings.TrimSpace(s.Find(X.GetCommentLocationSelector()).Text())
-		comment.Location = X.ParseLocation(locationText)
+		//  评论时间和地点 放在一起的
+		timeAndLocationText := strings.TrimSpace(s.Find(X.GetCommentTimeSelector()).Text())
+		comment.Time, comment.Location = X.ParseTimeAndLocation(timeAndLocationText)
 
 		comments = append(comments, comment)
 		commentCount++
@@ -277,29 +297,107 @@ func (X *XHS) ParseCommentID(commentStr string) string {
 	return commentStr
 }
 
+//格式：
+//   5210 数字
+//   2.7万 24.2万 含汉字
+//   赞 回复 收藏 点赞 评论 ——> 0
+//   带"千"字或"k/K"的数字（如"3.5千"或"3.5k"）
+//   带"亿"字的数字（如"1.2亿"）
+//   带加号的数字（如"999+"）
+//   识别"w"作为"万"的替代表示
+
 func (X *XHS) ParseNumber(numStr string) uint64 {
-	// 清理字符串，只保留数字
+	// 去除空白字符
+	numStr = strings.TrimSpace(numStr)
+	if numStr == "" {
+		logx.Debugf("解析数字: 空字符串 -> 0")
+		return 0
+	}
+
+	// 处理特定文本标签
+	specialLabels := []string{"赞", "回复", "收藏", "点赞", "评论"}
+	for _, label := range specialLabels {
+		if numStr == label {
+			logx.Debugf("解析数字: %s -> 0 (特定标签)", numStr)
+			return 0
+		}
+	}
+	var result uint64
+
+	// 检查是否包含"万"或"w"
+	if strings.Contains(numStr, "万") || strings.Contains(numStr, "w") {
+		// 移除所有空格
+		numStr = strings.ReplaceAll(numStr, " ", "")
+		re := regexp.MustCompile(`(\d+(\.\d+)?)[万w]`)
+		matches := re.FindStringSubmatch(numStr)
+		if len(matches) >= 2 {
+			num, err := strconv.ParseFloat(matches[1], 64)
+			if err == nil {
+				result = uint64(num * 10000)
+				logx.Debugf("解析数字: %s -> %d (万格式)", numStr, result)
+				return result
+			}
+		}
+	}
+
+	// 检查是否包含"亿"
+	if strings.Contains(numStr, "亿") {
+		numStr = strings.ReplaceAll(numStr, " ", "")
+		re := regexp.MustCompile(`(\d+(\.\d+)?)亿`)
+		matches := re.FindStringSubmatch(numStr)
+		if len(matches) >= 2 {
+			num, err := strconv.ParseFloat(matches[1], 64)
+			if err == nil {
+				result = uint64(num * 100000000)
+				logx.Debugf("解析数字: %s -> %d (亿格式)", numStr, result)
+				return result
+			}
+		}
+	}
+
+	// 检查是否包含"千"或"k"
+	if strings.Contains(numStr, "千") || strings.Contains(numStr, "k") || strings.Contains(numStr, "K") {
+		numStr = strings.ReplaceAll(numStr, " ", "")
+		re := regexp.MustCompile(`(\d+(\.\d+)?)[千kK]`)
+		matches := re.FindStringSubmatch(numStr)
+		if len(matches) >= 2 {
+			num, err := strconv.ParseFloat(matches[1], 64)
+			if err == nil {
+				result = uint64(num * 1000)
+				logx.Debugf("解析数字: %s -> %d (千格式)", numStr, result)
+				return result
+			}
+		}
+	}
+
+	// 检查是否带有加号，如"999+"
+	if strings.Contains(numStr, "+") {
+		numStr = strings.ReplaceAll(numStr, " ", "")
+		re := regexp.MustCompile(`(\d+)\+`)
+		matches := re.FindStringSubmatch(numStr)
+		if len(matches) >= 2 {
+			num, err := strconv.Atoi(matches[1])
+			if err == nil {
+				result = uint64(num)
+				logx.Debugf("解析数字: %s -> %d (加号格式)", numStr, result)
+				return result
+			}
+		}
+	}
+
+	// 如果以上都不匹配，尝试将其作为纯数字解析
 	re := regexp.MustCompile(`\d+`)
 	matches := re.FindStringSubmatch(numStr)
 	if len(matches) > 0 {
 		num, err := strconv.Atoi(matches[0])
 		if err == nil {
-			return uint64(num)
+			result = uint64(num)
+			logx.Debugf("解析数字: %s -> %d (纯数字格式)", numStr, result)
+			return result
 		}
 	}
 
-	// 检查是否包含"万"
-	if strings.Contains(numStr, "万") {
-		re := regexp.MustCompile(`(\d+(\.\d+)?)万`)
-		matches := re.FindStringSubmatch(numStr)
-		if len(matches) >= 2 {
-			num, err := strconv.ParseFloat(matches[1], 64)
-			if err == nil {
-				return uint64(num * 10000)
-			}
-		}
-	}
-
+	logx.Debugf("解析数字: %s -> 0 (解析失败)", numStr)
 	return 0
 }
 
@@ -312,183 +410,4 @@ func (X *XHS) RequireLogin(html string) bool {
 func (X *XHS) Login() error {
 	// todo: 扫码登录 或 手机验证码登录
 	return errors.New("登录功能未实现")
-}
-
-// 预编译的正则表达式
-// 格式：
-//
-//		编辑于 6天前 上海
-//		6天前 浙江
-//		05-14 湖北
-//		2024-05-05
-//		昨天 16:27 四川
-//		5小时前 四川
-//	 8分钟前 广东
-//	 刚刚 江西
-var (
-	// 时间相关正则
-	dayAgoRegex        = regexp.MustCompile(`(\d+)天前`)
-	hourAgoRegex       = regexp.MustCompile(`(\d+)小时前`)
-	monthDayRegex      = regexp.MustCompile(`(\d{2})-(\d{2})`)
-	yearMonthDayRegex  = regexp.MustCompile(`(\d{4})-(\d{2})-(\d{2})`)
-	todayTimeRegex     = regexp.MustCompile(`今天\s+(\d{1,2}):(\d{2})`)
-	yesterdayTimeRegex = regexp.MustCompile(`昨天\s+(\d{1,2}):(\d{2})`)
-)
-
-// ParseTimeAndLocation 小红书帖子中的 location 和 time 放在一起的所以可以一起解析
-func (X *XHS) ParseTimeAndLocation(str string) (timex time.Time, location string) {
-	logx.Debugf("时间和位置的文本：%v", str)
-
-	// 清理字符串
-	str = strings.TrimSpace(str)
-	str = strings.TrimPrefix(str, "编辑于")
-	str = strings.TrimSpace(str)
-
-	// 优先检查年月日格式(YYYY-MM-DD)，因为这是完整日期格式
-	if matches := yearMonthDayRegex.FindStringSubmatch(str); len(matches) == 4 {
-		year, errY := strconv.Atoi(matches[1])
-		month, errM := strconv.Atoi(matches[2])
-		day, errD := strconv.Atoi(matches[3])
-		if errY == nil && errM == nil && errD == nil {
-			timex = time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
-
-			// 移除日期部分，剩余的才是位置
-			locationStr := yearMonthDayRegex.ReplaceAllString(str, "")
-			location = strings.TrimSpace(locationStr)
-			return
-		}
-	}
-
-	// 其他时间格式
-	patterns := []*regexp.Regexp{
-		dayAgoRegex,        // 6天前
-		hourAgoRegex,       // 5小时前
-		monthDayRegex,      // 05-14
-		todayTimeRegex,     // 今天 16:27
-		yesterdayTimeRegex, // 昨天 16:27
-	}
-
-	// 尝试匹配其他时间格式
-	for _, re := range patterns {
-		matches := re.FindStringSubmatch(str)
-		if len(matches) >= 2 {
-			// 从原字符串中提取时间部分
-			timeStr := matches[0]
-			// 将匹配到的时间字符串转换为time.Time
-			parsedTime, err := X.ParseTime(timeStr)
-			if err == nil {
-				timex = parsedTime
-			}
-		}
-	}
-
-	// 未匹配到任何已知时间格式，可能是其他未知格式或只有位置信息
-	// 此时根据空格分割，假设最后一部分是位置
-	parts := strings.Fields(str)
-	if len(parts) > 0 {
-		location = parts[len(parts)-1]
-		if len(parts) > 1 {
-			// 尝试解析除最后一部分外的内容作为时间
-			timeStr := strings.Join(parts[:len(parts)-1], " ")
-			parsedTime, err := X.ParseTime(timeStr)
-			if err == nil {
-				return parsedTime, location
-			}
-		}
-	}
-
-	logx.Debugf("提取的时间和位置：%v + %v", timex, location)
-	return
-}
-
-func (X *XHS) ParseTime(timeStr string) (time.Time, error) {
-	now := time.Now()
-
-	// 移除可能存在的"编辑于"前缀
-	timeStr = strings.TrimPrefix(strings.TrimSpace(timeStr), "编辑于")
-	timeStr = strings.TrimSpace(timeStr)
-
-	// 处理"今天 HH:MM"格式
-	if matches := todayTimeRegex.FindStringSubmatch(timeStr); len(matches) == 3 {
-		hour, errH := strconv.Atoi(matches[1])
-		minute, errM := strconv.Atoi(matches[2])
-		if errH == nil && errM == nil {
-			return time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location()), nil
-		}
-	}
-
-	// 处理"昨天 HH:MM"格式
-	if matches := yesterdayTimeRegex.FindStringSubmatch(timeStr); len(matches) == 3 {
-		hour, errH := strconv.Atoi(matches[1])
-		minute, errM := strconv.Atoi(matches[2])
-		if errH == nil && errM == nil {
-			return time.Date(now.Year(), now.Month(), now.Day()-1, hour, minute, 0, 0, now.Location()), nil
-		}
-	}
-
-	// 处理"X天前"格式
-	if matches := dayAgoRegex.FindStringSubmatch(timeStr); len(matches) == 2 {
-		days, err := strconv.Atoi(matches[1])
-		if err == nil {
-			return time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location()), nil
-		}
-	}
-
-	// 处理"X小时前"格式
-	if matches := hourAgoRegex.FindStringSubmatch(timeStr); len(matches) == 2 {
-		hours, err := strconv.Atoi(matches[1])
-		if err == nil {
-			return now.Add(time.Duration(-hours) * time.Hour), nil
-		}
-	}
-
-	// 处理年月日格式 (YYYY-MM-DD)
-	if matches := yearMonthDayRegex.FindStringSubmatch(timeStr); len(matches) == 4 {
-		year, errY := strconv.Atoi(matches[1])
-		month, errM := strconv.Atoi(matches[2])
-		day, errD := strconv.Atoi(matches[3])
-		if errY == nil && errM == nil && errD == nil {
-			return time.Date(year, time.Month(month), day, 0, 0, 0, 0, now.Location()), nil
-		}
-	}
-
-	// 处理月日格式 (MM-DD)
-	if matches := monthDayRegex.FindStringSubmatch(timeStr); len(matches) == 3 {
-		month, errM := strconv.Atoi(matches[1])
-		day, errD := strconv.Atoi(matches[2])
-		if errM == nil && errD == nil {
-			// 假设是当年
-			date := time.Date(now.Year(), time.Month(month), day, 0, 0, 0, 0, now.Location())
-			// 如果日期在未来，则可能是去年的日期
-			if date.After(now) {
-				date = time.Date(now.Year()-1, time.Month(month), day, 0, 0, 0, 0, now.Location())
-			}
-			return date, nil
-		}
-	}
-
-	return time.Time{}, fmt.Errorf("无法解析时间格式: %s", timeStr)
-}
-func (X *XHS) ParseLocation(locationStr string) string {
-	// 清理字符串
-	locationStr = strings.TrimSpace(locationStr)
-	locationStr = strings.TrimPrefix(locationStr, "编辑于")
-	locationStr = strings.TrimSpace(locationStr)
-
-	// 处理各种日期格式模式并去除它们
-	patterns := []*regexp.Regexp{
-		dayAgoRegex,
-		hourAgoRegex,
-		monthDayRegex,
-		yearMonthDayRegex,
-		todayTimeRegex,
-		yesterdayTimeRegex,
-	}
-
-	for _, re := range patterns {
-		locationStr = re.ReplaceAllString(locationStr, "")
-		locationStr = strings.TrimSpace(locationStr)
-	}
-
-	return locationStr
 }

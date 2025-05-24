@@ -8,7 +8,7 @@ const (
 // Crawler 执行爬虫
 type Crawler interface {
 	// CollectPostLinks 根据 minLikes 筛选网页中的帖子链接
-	CollectPostLinks(resource Browser, site Site, keyword string, count uint64, minLikes uint64) (links []string, err error)
+	CollectPostLinks(resource Browser, filter Filter, site Site, keyword string, count uint64, minLikes uint64) (links []string, err error)
 	// CollectPostDetail 根据选项选择爬取帖子详情资源
 	CollectPostDetail(resource Browser, site Site, postURL string, opts ...*CollectPostDetailOption) (*Post, error)
 }

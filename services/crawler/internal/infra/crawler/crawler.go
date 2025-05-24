@@ -21,7 +21,7 @@ func NewCrawler() domain.Crawler {
 	return &Crawler{}
 }
 
-func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, keyword string, count uint64, minLikes uint64) ([]string, error) {
+func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter, site domain.Site, keyword string, count uint64, minLikes uint64) ([]string, error) {
 	//导航到搜索页面
 	searchURL := site.GetSearchURL(keyword)
 
@@ -55,7 +55,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 		//记录收集前的数量
 		start := len(links)
 
-		rawLinks, err := site.ParsePostLinks(content, minLikes)
+		rawLinks, err := site.ParsePostLinks(content, filter, minLikes)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, site domain.Site, key
 			return links, nil
 		}
 
-		logx.Infof("本页收集完毕，前往下页")
+		logx.Info("本页收集完毕，前往下页")
 		err = browser.ScrollPage()
 		if err != nil {
 			return nil, err
@@ -137,7 +137,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 
 	post.ID = site.ParsePostIDFromURL(postLink)
 
-	logx.Infof("帖子:%v", post)
+	logx.Debugf("获取到帖子内容:%v", post)
 
 	return post, nil
 }

@@ -10,6 +10,12 @@ Consul:
   Host: ${CONSUL_HOST}
   Key: ${CONSUL_SERVICE_KEY}
 
+Redisx:
+  Host: ${REDIS_HOST}
+  Type: ${REDIS_TYPE}
+  Pass: ${REDIS_PASS}
+  DB: ${REDIS_DB}
+
 MongoDB:
   URI: ${MONGODB_URI}
   Database: ${MONGODB_DATABASE}
@@ -31,3 +37,11 @@ Resource:
   InitialSize: ${RESOURCE_INITIAL_SIZE}
   HealthCheckInterval: ${RESOURCE_HEALTH_CHECK_INTERVAL}
   LoadBalancingStrategy: ${RESOURCE_LOAD_BALANCING_STRATEGY}
+
+BloomFilter:
+  Bits: ${BLOOM_FILTER_BITS}
+  Key: ${BLOOM_FILTER_KEY}
+
+SnowflakeID:
+  StartTime: ${SNOWFLAKE_START_TIME}
+  MachineNode: ${SNOWFLAKE_MACHINE_NODE}

@@ -7,7 +7,7 @@ import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/crawler"
 	"crawler/internal/infra/site"
-	"crawler/internal/infra/utils"
+	"crawler/internal/infra/utils/snowflake"
 	"errors"
 	"fmt"
 	"sync"
@@ -20,7 +20,8 @@ import (
 
 // TaskQueue 任务队列实现
 type TaskQueue struct {
-	repo         domain.Repository   // MongoDB存储仓库
+	repo         domain.Repository // MongoDB存储仓库
+	filter       domain.Filter
 	resourcePool domain.ResourcePool //资源池
 	crawler      domain.Crawler
 	mutex        sync.RWMutex      // 读写锁
@@ -32,13 +33,14 @@ type TaskQueue struct {
 }
 
 // NewTaskQueue 创建爬虫任务队列
-func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, resourcePool domain.ResourcePool) domain.TaskQueue {
+func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, filter domain.Filter, resourcePool domain.ResourcePool) domain.TaskQueue {
 	if repo == nil {
 		control.LogSeveref("仓库不能为空")
 	}
 
 	tq := &TaskQueue{
 		repo:         repo,
+		filter:       filter,
 		resourcePool: resourcePool,
 		crawler:      crawler.NewCrawler(),
 		mutex:        sync.RWMutex{},
@@ -121,7 +123,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	// 搜索关键词，获取帖子链接列表
 	logx.Infof("开始收集到帖子链接")
 
-	links, err := tq.crawler.CollectPostLinks(resource.Browser(), s, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
+	links, err := tq.crawler.CollectPostLinks(resource.Browser(), tq.filter, s, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
 		task.Err = fmt.Errorf("收集帖子链接失败：%w", err)
@@ -129,12 +131,12 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		return
 	}
 
-	logx.Infof("成功收集到 %d 个帖子链接", len(links))
+	logx.Debugf("成功收集到 %d 个帖子链接", len(links))
 
 	posts := make([]*domain.Post, 0, len(links))
 
 	for i, link := range links {
-		logx.Infof("开始爬取第 %d/%d 个帖子: %s", i+1, len(links), link)
+		logx.Debugf("开始爬取第 %d/%d 个帖子: %s", i+1, len(links), link)
 
 		post, err := tq.crawler.CollectPostDetail(resource.Browser(), s, link, &domain.CollectPostDetailOption{
 			IncludeComments:   task.Request.IncludeComments,
@@ -170,7 +172,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 // AddTask 【生产者】添加新任务到队列
 func (tq *TaskQueue) AddTask(request *proto.CrawlRequest) (string, error) {
 	// 创建新任务
-	taskID := utils.GenerateID()
+	taskID := snowflake.GenerateID()
 	now := time.Now()
 	logx.Infof("收到任务：%v", taskID)
 

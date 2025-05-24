@@ -5,7 +5,7 @@ import (
 	"crawler/internal/config"
 	"crawler/internal/control"
 	"crawler/internal/domain"
-	"crawler/internal/infra/utils"
+	"crawler/internal/infra/utils/loadBalancing"
 	"errors"
 	"fmt"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -361,11 +361,11 @@ func (p *Pool) LoadBalancingStrategy() domain.LoadBalancingStrategy {
 func (p *Pool) loadBalanced() (dataDir string, ip string, fingerPrint string) {
 	switch p.strategy {
 	case domain.Random:
-		return utils.GetRandomly3(p.dataDirs, p.ips, p.fingerPrints)
+		return loadBalancing.GetRandomly3(p.dataDirs, p.ips, p.fingerPrints)
 	case domain.Round:
-		return utils.GetByRound3(p.roundIdx.Add(1), p.dataDirs, p.ips, p.fingerPrints)
+		return loadBalancing.GetByRound3(p.roundIdx.Add(1), p.dataDirs, p.ips, p.fingerPrints)
 	default:
-		return utils.GetRandomly3(p.dataDirs, p.ips, p.fingerPrints)
+		return loadBalancing.GetRandomly3(p.dataDirs, p.ips, p.fingerPrints)
 	}
 }
 
