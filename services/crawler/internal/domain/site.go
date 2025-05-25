@@ -8,6 +8,8 @@ type Site interface {
 	GetSearchURL(keyword string) string
 	GetBaseURL() string
 
+	GetLoginCardSelector() string
+
 	GetPostCardSelector() string
 	GetPostLinkSelector() string
 	GetPostTitleSelector() string
@@ -40,5 +42,5 @@ type Site interface {
 	ParseCommentID(idStr string) string
 
 	RequireLogin(html string) (bool, error)
-	Login() error
+	Login(browser Browser) error
 }

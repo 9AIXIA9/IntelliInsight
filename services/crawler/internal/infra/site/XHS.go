@@ -17,6 +17,11 @@ import (
 // 检查是否实现 domain.Site
 var _ domain.Site = &XHS{}
 
+const (
+	waitTime      = 120 * time.Second
+	checkInterval = 10 * time.Second
+)
+
 type XHS struct{}
 
 func (X *XHS) GetName() string {
@@ -25,6 +30,10 @@ func (X *XHS) GetName() string {
 
 func (X *XHS) GetSearchURL(keyword string) string {
 	return fmt.Sprintf("https://www.xiaohongshu.com/search_result?keyword=%s", url.QueryEscape(keyword))
+}
+
+func (X *XHS) GetLoginCardSelector() string {
+	return ".login-container"
 }
 
 func (X *XHS) GetPostCardSelector() string {
@@ -412,11 +421,28 @@ func (X *XHS) RequireLogin(html string) (bool, error) {
 	}
 
 	// 检查是否存在登录容器元素
-	return doc.Find(".login-container").Length() > 0, nil
+	return doc.Find(X.GetLoginCardSelector()).Length() > 0, nil
 }
 
-func (X *XHS) Login() error {
-	// todo: 扫码登录 或 手机验证码登录
-	logx.Infof("未实现登录逻辑")
-	return errors.New("登录功能未实现")
+func (X *XHS) Login(browser domain.Browser) error {
+	logx.Infof("等待扫码登录")
+
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+
+	timer := time.NewTimer(waitTime)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			content := browser.GetPageContent()
+			if require, _ := X.RequireLogin(content); !require {
+				return nil
+			}
+			logx.Infof("请尽快扫码登录")
+		case <-timer.C:
+			return errors.New("登录时间耗尽")
+		}
+	}
 }

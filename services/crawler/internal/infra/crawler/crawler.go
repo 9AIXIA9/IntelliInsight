@@ -43,7 +43,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 	if require {
 		logx.Infof("%v需要登录", site.GetName())
 
-		if err = site.Login(); err != nil {
+		if err = site.Login(browser); err != nil {
 			return nil, fmt.Errorf("登录站点%s,出错：%w", site.GetName(), err)
 		}
 
@@ -118,7 +118,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 	if require {
 		logx.Infof("%v需要登录", site.GetName())
 
-		if err = site.Login(); err != nil {
+		if err = site.Login(browser); err != nil {
 			return nil, fmt.Errorf("登录站点%s,出错：%w", site.GetName(), err)
 		}
 
