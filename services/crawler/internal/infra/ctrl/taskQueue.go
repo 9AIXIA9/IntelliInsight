@@ -7,7 +7,6 @@ import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/crawler"
 	"crawler/internal/infra/site"
-	"crawler/internal/infra/utils/snowflake"
 	"errors"
 	"fmt"
 	"sync"
@@ -91,15 +90,15 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		if err := tq.repo.SaveTasks(ctx, task); err != nil {
+		if err := tq.repo.SaveTask(ctx, task); err != nil {
 			logx.Errorf("保存任务到MongoDB失败: %v", err)
 		}
 	}()
 
-	s, err := site.Convert(task.Request.Site)
+	s, err := site.Convert(task.Site)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
-		task.Err = errors.New("无法获取资源实例")
+		task.Err = fmt.Errorf("转换站点错误:%w", err)
 		logx.Error(task.Err)
 		return
 	}
@@ -111,7 +110,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	resource, err := tq.resourcePool.Get(ctx)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
-		task.Err = errors.New("无法获取资源实例")
+		task.Err = fmt.Errorf("无法获取资源实例:%w", err)
 		logx.Error(task.Err)
 		return
 	}
@@ -123,7 +122,7 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	// 搜索关键词，获取帖子链接列表
 	logx.Infof("开始收集到帖子链接")
 
-	links, err := tq.crawler.CollectPostLinks(resource.Browser(), tq.filter, s, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
+	links, err := tq.crawler.CollectPostLinks(resource.Browser(), tq.filter, s, task.Keyword, task.PostCount, task.MinLikes)
 	if err != nil {
 		task.Status = domain.StatusFailed.String()
 		task.Err = fmt.Errorf("收集帖子链接失败：%w", err)
@@ -139,10 +138,10 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		logx.Debugf("开始爬取第 %d/%d 个帖子: %s", i+1, len(links), link)
 
 		post, err := tq.crawler.CollectPostDetail(resource.Browser(), s, link, &domain.CollectPostDetailOption{
-			IncludeComments:   task.Request.IncludeComments,
-			IncludeImages:     task.Request.IncludeImages,
-			CommentsPerPost:   task.Request.CommentsPerPost,
-			RepliesPerComment: task.Request.RepliesPerComment,
+			IncludeComments: task.IncludeComments,
+			IncludeImages:   task.IncludeImages,
+			CommentsPerPost: task.CommentsPerPost,
+			MinLikes:        task.MinLikes,
 		})
 		if err != nil {
 			logx.Errorf("收集%v帖子时出错：%v", link, err)
@@ -162,8 +161,8 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := tq.repo.SavePosts(ctx, task.ID, posts); err != nil {
-		logx.Errorf("保存爬取结果到MongoDB失败: %v", err)
+	if err := tq.repo.SavePostsAndComments(ctx, task.ID, posts); err != nil {
+		logx.Errorf("保存爬取帖子到MongoDB失败: %v", err)
 	}
 
 	task.Status = domain.StatusCompleted.String()
@@ -172,18 +171,8 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 // AddTask 【生产者】添加新任务到队列
 func (tq *TaskQueue) AddTask(request *proto.CrawlRequest) (string, error) {
 	// 创建新任务
-	taskID := snowflake.GenerateID()
-	now := time.Now()
-	logx.Infof("收到任务：%v", taskID)
-
-	task := &domain.Task{
-		ID:             taskID,
-		Request:        request,
-		PostsCollected: 0,
-		StartTime:      now,
-		EndTime:        time.Time{},
-		Status:         domain.StatusPending.String(),
-	}
+	task := NewTask(request)
+	logx.Infof("收到任务：%v", task.ID)
 
 	// 发送任务到任务通道（如果队列在运行）
 	tq.mutex.Lock()
@@ -192,14 +181,14 @@ func (tq *TaskQueue) AddTask(request *proto.CrawlRequest) (string, error) {
 		tq.mutex.Unlock()
 
 		task.Status = domain.StatusRunning.String()
-		return taskID, nil
+		return task.ID, nil
 	}
 
 	tq.mutex.Unlock()
 	task.Status = domain.StatusFailed.String()
 	task.Err = errors.New("任务队列未运行")
 	logx.Error(task.Err)
-	return taskID, task.Err
+	return task.ID, task.Err
 }
 
 // Stop 停止任务队列处理

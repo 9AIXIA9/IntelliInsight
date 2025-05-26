@@ -64,15 +64,19 @@ func (X *XHS) GetPostTagsSelector() string {
 	return "div.note-content .tag"
 }
 
-func (X *XHS) GetLikeCountSelector() string {
+func (X *XHS) GetPostPageLikeCountSelector() string {
+	return ".like-wrapper .count"
+}
+
+func (X *XHS) GetPostDetailLikeCountSelector() string {
 	return ".engage-bar-style .like-wrapper .count"
 }
 
-func (X *XHS) GetCommentCountSelector() string {
+func (X *XHS) GetPostDetailCommentCountSelector() string {
 	return ".engage-bar-style .chat-wrapper .count"
 }
 
-func (X *XHS) GetCollectCountSelector() string {
+func (X *XHS) GetPostDetailCollectCountSelector() string {
 	return ".engage-bar-style .collect-wrapper .count"
 }
 
@@ -136,7 +140,8 @@ func (X *XHS) ParsePostLinks(html string, filter domain.Filter, minLikes uint64)
 
 	doc.Find(X.GetPostCardSelector()).Each(func(i int, s *goquery.Selection) {
 		// 获取帖子点赞数
-		likesText := s.Find(X.GetLikeCountSelector()).Text()
+		likesText := s.Find(X.GetPostPageLikeCountSelector()).Text()
+		logx.Debugf("点赞文本：%v", likesText)
 		likesNum := X.ParseNumber(likesText)
 
 		// 只收集点赞数达到要求的帖子
@@ -155,7 +160,7 @@ func (X *XHS) ParsePostLinks(html string, filter domain.Filter, minLikes uint64)
 			href = baseURL + href
 		}
 
-		// 去重过滤
+		//去重过滤
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
@@ -204,9 +209,9 @@ func (X *XHS) ParsePostPage(html string, includeImages bool) (*domain.Post, erro
 	post.Time, post.Location = X.ParseTimeAndLocation(timeAndLocationText)
 
 	// 统计数据
-	post.LikeCount = X.ParseNumber(doc.Find(X.GetLikeCountSelector()).Text())
-	post.CollectCount = X.ParseNumber(doc.Find(X.GetCollectCountSelector()).Text())
-	post.CommentCount = X.ParseNumber(doc.Find(X.GetCommentCountSelector()).Text())
+	post.LikeCount = X.ParseNumber(doc.Find(X.GetPostDetailLikeCountSelector()).Text())
+	post.CollectCount = X.ParseNumber(doc.Find(X.GetPostDetailCollectCountSelector()).Text())
+	post.CommentCount = X.ParseNumber(doc.Find(X.GetPostDetailCommentCountSelector()).Text())
 
 	// 标签 - 处理转义字符
 	var tags []string
@@ -236,7 +241,7 @@ func (X *XHS) ParsePostPage(html string, includeImages bool) (*domain.Post, erro
 	return post, nil
 }
 
-func (X *XHS) ParseComments(html string, count uint64, minReplyCount uint64) ([]*domain.Comment, error) {
+func (X *XHS) ParseComments(html string, count uint64, minLikes uint64) ([]*domain.Comment, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, err
@@ -264,8 +269,16 @@ func (X *XHS) ParseComments(html string, count uint64, minReplyCount uint64) ([]
 		// 评论作者
 		comment.Commenter = strings.TrimSpace(s.Find(X.GetCommenterSelector()).Text())
 
+		//处理一下作者名
+		//	周周周十一作者 -> 周周周十一（作者）
+		comment.Commenter = strings.Replace(comment.Commenter, "作者", "（创作者）", 1)
+
 		// 点赞数
 		comment.LikeCount = X.ParseNumber(s.Find(X.GetCommentLikeCountSelector()).Text())
+		if comment.LikeCount < minLikes {
+			logx.Debugf("赞数过少跳过该评论")
+			return
+		}
 
 		// 回复数
 		comment.ReplyCount = X.ParseNumber(s.Find(X.GetCommentReplyCountSelector()).Text())

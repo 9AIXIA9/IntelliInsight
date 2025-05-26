@@ -67,17 +67,17 @@ func (Site) EnumDescriptor() ([]byte, []int) {
 
 // 爬虫请求参数
 type CrawlRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Site              Site                   `protobuf:"varint,1,opt,name=site,proto3,enum=crawler.Site" json:"site,omitempty"`                                    //爬取站点
-	Keyword           string                 `protobuf:"bytes,2,opt,name=keyword,proto3" json:"keyword,omitempty"`                                                 // 搜索关键词，例如"南昌"
-	PostCount         uint64                 `protobuf:"varint,3,opt,name=post_count,json=postCount,proto3" json:"post_count,omitempty"`                           // 爬取帖子数量
-	MinLikes          uint64                 `protobuf:"varint,4,opt,name=min_likes,json=minLikes,proto3" json:"min_likes,omitempty"`                              // 最少点赞数筛选
-	CommentsPerPost   uint64                 `protobuf:"varint,5,opt,name=comments_per_post,json=commentsPerPost,proto3" json:"comments_per_post,omitempty"`       // 每个帖子爬取的评论数量
-	RepliesPerComment uint64                 `protobuf:"varint,6,opt,name=replies_per_comment,json=repliesPerComment,proto3" json:"replies_per_comment,omitempty"` // 每条评论爬取的回复数量
-	IncludeComments   bool                   `protobuf:"varint,7,opt,name=include_comments,json=includeComments,proto3" json:"include_comments,omitempty"`         // 是否包含评论
-	IncludeImages     bool                   `protobuf:"varint,8,opt,name=include_images,json=includeImages,proto3" json:"include_images,omitempty"`               // 是否爬取图片URL
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Site            Site                   `protobuf:"varint,1,opt,name=site,proto3,enum=crawler.Site" json:"site,omitempty"`                              //爬取站点
+	Keyword         string                 `protobuf:"bytes,2,opt,name=keyword,proto3" json:"keyword,omitempty"`                                           // 搜索关键词，例如"南昌"
+	PostCount       uint64                 `protobuf:"varint,3,opt,name=post_count,json=postCount,proto3" json:"post_count,omitempty"`                     // 爬取帖子数量
+	MinLikes        uint64                 `protobuf:"varint,4,opt,name=min_likes,json=minLikes,proto3" json:"min_likes,omitempty"`                        // 最少点赞数筛选
+	CommentMinLikes uint64                 `protobuf:"varint,5,opt,name=comment_min_likes,json=commentMinLikes,proto3" json:"comment_min_likes,omitempty"` // 每条评论爬取的回复数量
+	CommentsPerPost uint64                 `protobuf:"varint,6,opt,name=comments_per_post,json=commentsPerPost,proto3" json:"comments_per_post,omitempty"` // 每个帖子爬取的评论数量
+	IncludeComments bool                   `protobuf:"varint,7,opt,name=include_comments,json=includeComments,proto3" json:"include_comments,omitempty"`   // 是否包含评论
+	IncludeImages   bool                   `protobuf:"varint,8,opt,name=include_images,json=includeImages,proto3" json:"include_images,omitempty"`         // 是否爬取图片URL
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CrawlRequest) Reset() {
@@ -138,16 +138,16 @@ func (x *CrawlRequest) GetMinLikes() uint64 {
 	return 0
 }
 
-func (x *CrawlRequest) GetCommentsPerPost() uint64 {
+func (x *CrawlRequest) GetCommentMinLikes() uint64 {
 	if x != nil {
-		return x.CommentsPerPost
+		return x.CommentMinLikes
 	}
 	return 0
 }
 
-func (x *CrawlRequest) GetRepliesPerComment() uint64 {
+func (x *CrawlRequest) GetCommentsPerPost() uint64 {
 	if x != nil {
-		return x.RepliesPerComment
+		return x.CommentsPerPost
 	}
 	return 0
 }
@@ -231,15 +231,15 @@ var File_shared_protos_crawler_proto protoreflect.FileDescriptor
 
 const file_shared_protos_crawler_proto_rawDesc = "" +
 	"\n" +
-	"\x1bshared/protos/crawler.proto\x12\acrawler\"\xb5\x02\n" +
+	"\x1bshared/protos/crawler.proto\x12\acrawler\"\xb1\x02\n" +
 	"\fCrawlRequest\x12!\n" +
 	"\x04site\x18\x01 \x01(\x0e2\r.crawler.SiteR\x04site\x12\x18\n" +
 	"\akeyword\x18\x02 \x01(\tR\akeyword\x12\x1d\n" +
 	"\n" +
 	"post_count\x18\x03 \x01(\x04R\tpostCount\x12\x1b\n" +
 	"\tmin_likes\x18\x04 \x01(\x04R\bminLikes\x12*\n" +
-	"\x11comments_per_post\x18\x05 \x01(\x04R\x0fcommentsPerPost\x12.\n" +
-	"\x13replies_per_comment\x18\x06 \x01(\x04R\x11repliesPerComment\x12)\n" +
+	"\x11comment_min_likes\x18\x05 \x01(\x04R\x0fcommentMinLikes\x12*\n" +
+	"\x11comments_per_post\x18\x06 \x01(\x04R\x0fcommentsPerPost\x12)\n" +
 	"\x10include_comments\x18\a \x01(\bR\x0fincludeComments\x12%\n" +
 	"\x0einclude_images\x18\b \x01(\bR\rincludeImages\"\\\n" +
 	"\rCrawlResponse\x12\x17\n" +

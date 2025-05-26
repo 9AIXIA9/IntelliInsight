@@ -12,13 +12,15 @@ type Site interface {
 
 	GetPostCardSelector() string
 	GetPostLinkSelector() string
+	GetPostPageLikeCountSelector() string
+
 	GetPostTitleSelector() string
 	GetPostContentSelector() string
 	GetPosterSelector() string
 	GetPostTagsSelector() string
-	GetLikeCountSelector() string
-	GetCommentCountSelector() string
-	GetCollectCountSelector() string
+	GetPostDetailLikeCountSelector() string
+	GetPostDetailCommentCountSelector() string
+	GetPostDetailCollectCountSelector() string
 	GetImageURLSelector() string
 	GetTimeSelector() string
 	GetLocationSelector() string
@@ -33,7 +35,7 @@ type Site interface {
 
 	ParsePostLinks(html string, filter Filter, minLikes uint64) ([]string, error)
 	ParsePostPage(html string, includeImages bool) (*Post, error)
-	ParseComments(html string, count uint64, minReplyCount uint64) ([]*Comment, error)
+	ParseComments(html string, count uint64, minLikes uint64) ([]*Comment, error)
 
 	ParseNumber(numStr string) uint64
 	ParseLocation(locationStr string) string

@@ -16,8 +16,8 @@ message CrawlRequest {
   string keyword = 2;                  // 搜索关键词，例如"南昌"
   uint64 post_count = 3;                // 爬取帖子数量
   uint64 min_likes = 4;                 // 最少点赞数筛选
-  uint64 comments_per_post = 5;         // 每个帖子爬取的评论数量
-  uint64 replies_per_comment = 6;       // 每条评论爬取的回复数量
+  uint64 comment_min_likes = 5;       // 每条评论爬取的回复数量
+  uint64 comments_per_post = 6;         // 每个帖子爬取的评论数量
   bool include_comments = 7;           // 是否包含评论
   bool include_images = 8;             // 是否爬取图片URL
 }

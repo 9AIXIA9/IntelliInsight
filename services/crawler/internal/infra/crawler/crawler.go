@@ -31,7 +31,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 	}
 
 	// 在页面导航后添加随机延时
-	utils.DelayRandomly(6000)
+	utils.DelayRandomly(10000)
 
 	//检查是否需要登录
 	content := browser.GetPageContent()
@@ -49,16 +49,14 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 
 		logx.Infof("登录成功%v", site.GetName())
 		// 登录成功后添加随机延时
-		utils.DelayRandomly(2500)
+		utils.DelayRandomly(5000)
 	}
 
 	links := make([]string, 0, count)
 
 	for i := 0; i < maxTimes; i++ {
+		logx.Debugf("第%v次在页面中收集帖子", i)
 		content = browser.GetPageContent()
-
-		//记录收集前的数量
-		start := len(links)
 
 		rawLinks, err := site.ParsePostLinks(content, filter, minLikes)
 		if err != nil {
@@ -66,6 +64,7 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 		}
 
 		for _, link := range rawLinks {
+			logx.Debugf("第%v个帖子", i)
 			if !utils.Contains(links, link) {
 				links = append(links, link)
 			}
@@ -75,18 +74,13 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 			}
 		}
 
-		//判断链接是否增多
-		if len(links) == start {
-			return links, nil
-		}
-
-		logx.Info("本页收集完毕，前往下页")
+		logx.Debugf("本页收集完毕，正在下翻")
 		err = browser.ScrollPage()
 		if err != nil {
 			return nil, err
 		}
 
-		utils.DelayRandomly(3000)
+		utils.DelayRandomly(8000)
 	}
 
 	return nil, errors.New("次数过多")
@@ -107,7 +101,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 	}
 
 	// 在页面导航后添加随机延时
-	utils.DelayRandomly(6000)
+	utils.DelayRandomly(9000)
 
 	content := browser.GetPageContent()
 	require, err := site.RequireLogin(content)
@@ -123,8 +117,8 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 		}
 
 		logx.Infof("登录成功%v", site.GetName())
-		// 登录成功后添加随机延时
-		utils.DelayRandomly(5000)
+		// 登录成功后添加随机延时关闭资源池被取消
+		utils.DelayRandomly(10000)
 	}
 
 	//基础信息
@@ -137,7 +131,7 @@ func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, po
 
 	//获取评论及回复
 	if opt.IncludeComments {
-		comments, err := site.ParseComments(content, opt.CommentsPerPost, opt.RepliesPerComment)
+		comments, err := site.ParseComments(content, opt.CommentsPerPost, opt.MinLikes)
 		if err != nil {
 			logx.Errorf("获取评论错误：%v", err)
 			return post, nil

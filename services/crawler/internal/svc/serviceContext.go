@@ -25,6 +25,7 @@ func MustNewServiceContext(c *config.Config) *ServiceContext {
 		mongoClient,
 		c.MongoDB.Database,
 		c.MongoDB.PostCollection,
+		c.MongoDB.CommentCollection,
 		c.MongoDB.TaskCollection,
 	)
 

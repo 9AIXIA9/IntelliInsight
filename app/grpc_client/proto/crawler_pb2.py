@@ -22,7 +22,7 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\rcrawler.proto\x12\x07\x63rawler\"\xcd\x01\n\x0c\x43rawlRequest\x12\x1b\n\x04site\x18\x01 \x01(\x0e\x32\r.crawler.Site\x12\x0f\n\x07keyword\x18\x02 \x01(\t\x12\x12\n\npost_count\x18\x03 \x01(\x05\x12\x11\n\tmin_likes\x18\x04 \x01(\x05\x12\x19\n\x11\x63omments_per_post\x18\x05 \x01(\x05\x12\x1b\n\x13replies_per_comment\x18\x06 \x01(\x05\x12\x18\n\x10include_comments\x18\x07 \x01(\x08\x12\x16\n\x0einclude_images\x18\x08 \x01(\x08\"B\n\rCrawlResponse\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"\xf2\x01\n\x08PostItem\x12\x0f\n\x07post_id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x0e\n\x06\x61uthor\x18\x04 \x01(\t\x12\r\n\x05likes\x18\x05 \x01(\x05\x12\x14\n\x0cpublish_time\x18\x06 \x01(\x03\x12\x0e\n\x06images\x18\x07 \x03(\t\x12\"\n\x08\x63omments\x18\x08 \x03(\x0b\x32\x10.crawler.Comment\x12\x0c\n\x04tags\x18\t \x03(\t\x12\x10\n\x08location\x18\n \x01(\t\x12\x10\n\x08\x63ollects\x18\x0b \x01(\x05\x12\r\n\x05\x63hats\x18\x0c \x01(\x05\x12\x0b\n\x03url\x18\r \x01(\t\"\xb7\x01\n\x07\x43omment\x12\x12\n\ncomment_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x0e\n\x06\x61uthor\x18\x03 \x01(\t\x12\r\n\x05likes\x18\x04 \x01(\x05\x12\x14\n\x0c\x63omment_time\x18\x05 \x01(\x03\x12\x18\n\x10\x63omment_location\x18\x06 \x01(\t\x12!\n\x07replies\x18\x07 \x03(\x0b\x32\x10.crawler.Comment\x12\x15\n\rreplies_count\x18\x08 \x01(\x05*\x17\n\x04Site\x12\x0f\n\x0bXIAOHONGSHU\x10\x00\x32M\n\x0e\x43rawlerService\x12;\n\nStartCrawl\x12\x15.crawler.CrawlRequest\x1a\x16.crawler.CrawlResponseB\tZ\x07./protob\x06proto3')
+    b'\n\rcrawler.proto\x12\x07\x63rawler\"\xcb\x01\n\x0c\x43rawlRequest\x12\x1b\n\x04site\x18\x01 \x01(\x0e\x32\r.crawler.Site\x12\x0f\n\x07keyword\x18\x02 \x01(\t\x12\x12\n\npost_count\x18\x03 \x01(\x04\x12\x11\n\tmin_likes\x18\x04 \x01(\x04\x12\x19\n\x11\x63omment_min_likes\x18\x05 \x01(\x04\x12\x19\n\x11\x63omments_per_post\x18\x06 \x01(\x04\x12\x18\n\x10include_comments\x18\x07 \x01(\x08\x12\x16\n\x0einclude_images\x18\x08 \x01(\x08\"B\n\rCrawlResponse\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t*\x17\n\x04Site\x12\x0f\n\x0bXIAOHONGSHU\x10\x00\x32M\n\x0e\x43rawlerService\x12;\n\nStartCrawl\x12\x15.crawler.CrawlRequest\x1a\x16.crawler.CrawlResponseB\tZ\x07./protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -30,16 +30,12 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'crawler_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
     _globals['DESCRIPTOR']._loaded_options = None
     _globals['DESCRIPTOR']._serialized_options = b'Z\007./proto'
-    _globals['_SITE']._serialized_start = 733
-    _globals['_SITE']._serialized_end = 756
+    _globals['_SITE']._serialized_start = 300
+    _globals['_SITE']._serialized_end = 323
     _globals['_CRAWLREQUEST']._serialized_start = 27
-    _globals['_CRAWLREQUEST']._serialized_end = 232
-    _globals['_CRAWLRESPONSE']._serialized_start = 234
-    _globals['_CRAWLRESPONSE']._serialized_end = 300
-    _globals['_POSTITEM']._serialized_start = 303
-    _globals['_POSTITEM']._serialized_end = 545
-    _globals['_COMMENT']._serialized_start = 548
-    _globals['_COMMENT']._serialized_end = 731
-    _globals['_CRAWLERSERVICE']._serialized_start = 758
-    _globals['_CRAWLERSERVICE']._serialized_end = 835
+    _globals['_CRAWLREQUEST']._serialized_end = 230
+    _globals['_CRAWLRESPONSE']._serialized_start = 232
+    _globals['_CRAWLRESPONSE']._serialized_end = 298
+    _globals['_CRAWLERSERVICE']._serialized_start = 325
+    _globals['_CRAWLERSERVICE']._serialized_end = 402
 # @@protoc_insertion_point(module_scope)

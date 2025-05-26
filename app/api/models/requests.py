@@ -8,5 +8,5 @@ class CrawlRequest(BaseModel):
     include_comments: bool = Field(default=True, description="是否包含评论")
     min_likes: int = Field(default=0, description="最少点赞数")
     comments_per_post: int = Field(default=10, description="每帖评论数")
-    replies_per_comment: int = Field(default=5, description="每评论回复数")
+    comment_min_likes: int = Field(default=5, description="评论最少点赞数")  # 修改字段名和描述
     include_images: bool = Field(default=True, description="是否包含图片")

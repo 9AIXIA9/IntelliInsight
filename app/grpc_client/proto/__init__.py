@@ -11,8 +11,9 @@ if current_dir not in sys.path:
 
 # 动态导入模块
 try:
-    from crawler_pb2 import CrawlRequest, CrawlResponse, PostItem, Comment, Site
-    from crawler_pb2 import DESCRIPTOR, _CRAWLREQUEST, _CRAWLRESPONSE, _POSTITEM, _COMMENT, _CRAWLERSERVICE, _SITE
+    # 只导入实际存在的类
+    from crawler_pb2 import CrawlRequest, CrawlResponse, Site
+    from crawler_pb2 import DESCRIPTOR, _CRAWLREQUEST, _CRAWLRESPONSE, _CRAWLERSERVICE, _SITE
     from crawler_pb2_grpc import CrawlerServiceStub
 except ImportError:
     # 如果直接导入失败，尝试更复杂的方法
@@ -32,13 +33,11 @@ except ImportError:
     pb2_grpc = importlib.util.module_from_spec(spec2)
     spec2.loader.exec_module(pb2_grpc)
 
-    # 从动态加载的模块中导出
+    # 从动态加载的模块中导出，只导入实际存在的类
     CrawlRequest = pb2.CrawlRequest
     CrawlResponse = pb2.CrawlResponse
-    PostItem = pb2.PostItem
-    Comment = pb2.Comment
     Site = pb2.Site
     CrawlerServiceStub = pb2_grpc.CrawlerServiceStub
 
 # 导出类以供使用
-__all__ = ['CrawlRequest', 'CrawlResponse', 'Site', 'PostItem', 'Comment', 'CrawlerServiceStub']
+__all__ = ['CrawlRequest', 'CrawlResponse', 'Site', 'CrawlerServiceStub']

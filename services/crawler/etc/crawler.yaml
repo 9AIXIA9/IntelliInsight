@@ -21,6 +21,7 @@ MongoDB:
   Database: ${MONGODB_DATABASE}
   PostCollection: ${MONGODB_POST_COLLECTION}
   TaskCollection: ${MONGODB_TASK_COLLECTION}
+  CommentCollection: ${MONGODB_COMMENT_COLLECTION}
 
 TaskQueue:
   WorkQueueSize: ${TASK_QUEUE_WORK_QUEUE_SIZE}

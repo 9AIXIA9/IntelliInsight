@@ -1,8 +1,7 @@
 package domain
 
 const (
-	defaultCommentsPerPost   = 10
-	defaultRepliesPerComment = 5
+	defaultCommentsPerPost = 10
 )
 
 // Crawler 执行爬虫
@@ -14,10 +13,11 @@ type Crawler interface {
 }
 
 type CollectPostDetailOption struct {
-	IncludeComments   bool
-	IncludeImages     bool
-	CommentsPerPost   uint64
-	RepliesPerComment uint64
+	IncludeComments  bool
+	IncludeImages    bool
+	CommentsPerPost  uint64
+	MinLikes         uint64
+	CommentsMinLikes uint64
 }
 
 func (opt *CollectPostDetailOption) WithDefault() *CollectPostDetailOption {
@@ -25,8 +25,8 @@ func (opt *CollectPostDetailOption) WithDefault() *CollectPostDetailOption {
 		opt.CommentsPerPost = defaultCommentsPerPost
 	}
 
-	if opt.RepliesPerComment < 0 {
-		opt.RepliesPerComment = defaultRepliesPerComment
+	if opt.MinLikes < 0 {
+		opt.MinLikes = 0
 	}
 
 	return opt

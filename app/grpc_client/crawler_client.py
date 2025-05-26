@@ -129,7 +129,7 @@ class CrawlerClient:
                     include_comments: bool = True,
                     min_likes: int = 0,
                     comments_per_post: int = 10,
-                    replies_per_comment: int = 5,
+                    comment_min_likes: int = 5,  # 修改参数名称
                     include_images: bool = True) -> Dict[str, Union[str, bool]]:
         """启动爬虫任务
 
@@ -140,7 +140,7 @@ class CrawlerClient:
             include_comments: 是否包含评论
             min_likes: 最少点赞数筛选
             comments_per_post: 每个帖子爬取的评论数量
-            replies_per_comment: 每条评论爬取的回复数量
+            comment_min_likes: 评论最少点赞数  # 修改注释
             include_images: 是否爬取图片URL
 
         Returns:
@@ -153,7 +153,7 @@ class CrawlerClient:
             include_comments=include_comments,
             min_likes=min_likes,
             comments_per_post=comments_per_post,
-            replies_per_comment=replies_per_comment,
+            comment_min_likes=comment_min_likes,  # 使用正确的字段名
             include_images=include_images
         )
 

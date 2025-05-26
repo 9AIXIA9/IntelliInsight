@@ -27,10 +27,11 @@ type Config struct {
 }
 
 type MongoDB struct {
-	URI            string
-	Database       string
-	PostCollection string
-	TaskCollection string
+	URI               string
+	Database          string
+	PostCollection    string
+	CommentCollection string
+	TaskCollection    string
 }
 
 type TaskQueue struct {

@@ -21,12 +21,14 @@ type Post struct {
 	CollectCount uint64 `bson:"collect_count"`
 
 	ImageURLs []string   `bson:"image_urls"`
-	Comments  []*Comment `bson:"comments"`
+	Comments  []*Comment `bson:"-"`
 }
 
 // Comment 评论模型
 type Comment struct {
 	ID        string    `bson:"_id"`
+	TaskID    string    `bson:"task_id"`
+	PostID    string    `bson:"post_id"`
 	Commenter string    `bson:"commenter"`
 	Time      time.Time `bson:"time"`
 	Location  string    `bson:"location"`
