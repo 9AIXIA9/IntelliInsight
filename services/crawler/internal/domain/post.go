@@ -40,7 +40,7 @@ type Comment struct {
 	//Replies []*Comment
 }
 
-// 暂时降低难度 暂不实现回复
+// 暂时复杂度 暂不实现回复
 //因为回复大部分都是在闲聊 性价比太低了
 //// Reply 回复模型
 //type Reply struct {
