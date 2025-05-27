@@ -203,9 +203,8 @@ func (tq *TaskQueue) ProcessTask(task *domain.Task) {
 		return
 	}
 
-	if resource == nil {
-		task.Err = errors.New("获取资源为空")
-		logx.Errorf("获取资源为空，但是未报错")
+	//资源和错误均为空 说明重新加入队列了 不必再处理
+	if resource == nil || task.Status == domain.StatusPending {
 		return
 	}
 
@@ -256,19 +255,10 @@ func (tq *TaskQueue) acquireResource(task *domain.Task) (domain.ResourceUnit, er
 			if err = tq.AddTask(task); err != nil {
 				return nil, fmt.Errorf("获取资源失败且无法重新加入队列：%w", task.Err)
 			}
-			return nil, err
+			//成功返回队列
+			return nil, nil
 		}
 		return nil, fmt.Errorf("无法获取资源实例: %w", err)
-	}
-
-	// 资源非空检查
-	if resource == nil {
-		task.Status = domain.StatusPending
-		task.Err = errors.New("获取到空资源")
-		if err = tq.AddTask(task); err != nil {
-			return nil, fmt.Errorf("获取到空资源且无法重新加入队列")
-		}
-		return nil, task.Err
 	}
 
 	return resource, nil
@@ -361,7 +351,7 @@ func (tq *TaskQueue) finalizeTask(task *domain.Task) {
 
 // NeedToDivide 是否需要分治
 func (tq *TaskQueue) NeedToDivide(task *domain.Task) bool {
-	return task.PostCount > tq.divideThreshold
+	return task.ParentID == "" && (task.PostCount > tq.divideThreshold)
 }
 
 // DivideTask 分治任务 - 均匀分配方式
