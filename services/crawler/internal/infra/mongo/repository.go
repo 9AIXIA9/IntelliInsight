@@ -31,7 +31,7 @@ func (r *Repository) SaveTask(ctx context.Context, task *domain.Task) error {
 	}
 
 	// 检查任务是否已存在
-	filter := bson.M{"_id": task.ID}
+	filter := bson.M{"_id": task.Info.ID}
 	count, err := r.taskCollection.CountDocuments(ctx, filter)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (r *Repository) SaveTask(ctx context.Context, task *domain.Task) error {
 }
 
 // SavePosts 保存爬取到的帖子，返回新增帖子和评论
-func (r *Repository) SavePosts(ctx context.Context, taskID string, posts []*domain.Post) error {
+func (r *Repository) SavePosts(ctx context.Context, taskID domain.TaskID, posts []*domain.Post) error {
 	if len(posts) == 0 {
 		return nil
 	}
@@ -101,7 +101,7 @@ func (r *Repository) SavePosts(ctx context.Context, taskID string, posts []*doma
 }
 
 // SavePostsAndComments 保存爬取到的帖子和评论
-func (r *Repository) SavePostsAndComments(ctx context.Context, taskID string, posts []*domain.Post) error {
+func (r *Repository) SavePostsAndComments(ctx context.Context, taskID domain.TaskID, posts []*domain.Post) error {
 	if len(posts) == 0 {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (r *Repository) SavePostsAndComments(ctx context.Context, taskID string, po
 }
 
 // SaveComments 保存爬取到的评论到独立集合
-func (r *Repository) SaveComments(ctx context.Context, taskID, postID string, comments []*domain.Comment) error {
+func (r *Repository) SaveComments(ctx context.Context, taskID domain.TaskID, postID string, comments []*domain.Comment) error {
 	if len(comments) == 0 {
 		return nil
 	}

@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"crawler/internal/config"
-	"crawler/internal/control"
 	"crawler/internal/domain"
 	"crawler/internal/infra/utils/loadBalancing"
 	"errors"
@@ -43,7 +42,7 @@ type Pool struct {
 
 func MustNewResourcePool(conf config.Resource) domain.ResourcePool {
 	if len(conf.DataBasePath) == 0 {
-		control.LogSeveref("资源池初始化失败：数据路径为空")
+		logx.Severef("资源池初始化失败：数据路径为空")
 	}
 
 	if conf.MaxPoolSize < 0 {
@@ -77,11 +76,11 @@ func MustNewResourcePool(conf config.Resource) domain.ResourcePool {
 
 	//加载用户数据目录
 	if err := pool.loadDataCatalog(conf.DataBasePath); err != nil {
-		control.LogSeveref("加载数据目录失败：%v", err)
+		logx.Severef("加载数据目录失败：%v", err)
 	}
 
 	if err := pool.initialize(conf.InitialSize); err != nil {
-		control.LogSeveref("初始化资源池失败：%v", err)
+		logx.Severef("初始化资源池失败：%v", err)
 	}
 
 	pool.AsyncHealthCheck(conf.HealthCheckInterval)

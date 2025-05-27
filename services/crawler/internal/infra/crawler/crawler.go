@@ -3,7 +3,6 @@ package crawler
 import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/utils"
-	"errors"
 	"fmt"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -83,7 +82,8 @@ func (c *Crawler) CollectPostLinks(browser domain.Browser, filter domain.Filter,
 		utils.DelayRandomly(8000)
 	}
 
-	return nil, errors.New("次数过多")
+	logx.Infof("尝试次数过多，共收集到%v个帖子", len(links))
+	return links, nil
 }
 
 func (c *Crawler) CollectPostDetail(browser domain.Browser, site domain.Site, postLink string, opts ...*domain.CollectPostDetailOption) (*domain.Post, error) {

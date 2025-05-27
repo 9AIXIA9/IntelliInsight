@@ -59,7 +59,7 @@ type WrappedServer struct {
 func (s *WrappedServer) Start() {
 	// 添加Consul服务注册
 	if err := consul.RegisterService(s.conf.ListenOn, s.conf.Consul); err != nil {
-		control.LogSeveref("注册服务到Consul失败: %v", err)
+		logx.Severef("注册服务到Consul失败: %v", err)
 		return
 	}
 	logx.Infof("成功注册服务到Consul")

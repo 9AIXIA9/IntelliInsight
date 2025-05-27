@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"crawler/internal/domain"
 	"github.com/zeromicro/go-zero/core/logx"
 	"time"
 
@@ -31,6 +32,6 @@ func Init(startTime time.Time, machineNode int64) (err error) {
 }
 
 // GenerateID 生成用户ID
-func GenerateID() string {
-	return userIDNode.Generate().String()
+func GenerateID() domain.TaskID {
+	return domain.TaskID(userIDNode.Generate().String())
 }

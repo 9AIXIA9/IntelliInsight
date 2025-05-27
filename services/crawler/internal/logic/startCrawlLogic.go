@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"crawler/internal/infra/ctrl"
 
 	"crawler/internal/svc"
 	"crawler/proto"
@@ -37,21 +38,25 @@ func (l *StartCrawlLogic) StartCrawl(in *proto.CrawlRequest) (*proto.CrawlRespon
 		in.PostCount = 1 // 默认至少爬取1页
 	}
 
+	// 创建新任务
+	task := ctrl.NewTask(in)
+
 	// 提交任务到队列
-	taskID, err := l.svcCtx.TaskQueue.AddTask(in)
+
+	err := l.svcCtx.TaskQueue.AddTask(task)
 	if err != nil {
 		return &proto.CrawlResponse{
-			TaskId:  taskID,
+			TaskId:  string(task.Info.ID),
 			Success: false,
 			Message: err.Error(),
 		}, err
 	}
 
 	l.Logger.Infof("启动新爬虫任务: %s, 关键词: %s, 页数: %d",
-		taskID, in.Keyword, in.PostCount)
+		task.Info.ID, in.Keyword, in.PostCount)
 
 	return &proto.CrawlResponse{
-		TaskId:  taskID,
+		TaskId:  string(task.Info.ID),
 		Success: true,
 		Message: "任务已成功提交",
 	}, nil

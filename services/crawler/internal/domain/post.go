@@ -7,7 +7,7 @@ import (
 // Post 帖子模型
 type Post struct {
 	ID       string    `bson:"_id"`
-	TaskID   string    `bson:"task_id"`
+	TaskID   TaskID    `bson:"task_id"`
 	Title    string    `bson:"title"`
 	Poster   string    `bson:"poster"`
 	Time     time.Time `bson:"time"`
@@ -27,7 +27,7 @@ type Post struct {
 // Comment 评论模型
 type Comment struct {
 	ID        string    `bson:"_id"`
-	TaskID    string    `bson:"task_id"`
+	TaskID    TaskID    `bson:"task_id"`
 	PostID    string    `bson:"post_id"`
 	Commenter string    `bson:"commenter"`
 	Time      time.Time `bson:"time"`
@@ -44,7 +44,7 @@ type Comment struct {
 //因为回复大部分都是在闲聊 性价比太低了
 //// Reply 回复模型
 //type Reply struct {
-//	ID       string
+//	TaskID       string
 //	Replier  string
 //	Time     time.Time
 //	Location string
