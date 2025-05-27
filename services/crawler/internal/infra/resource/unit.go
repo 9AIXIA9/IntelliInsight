@@ -33,7 +33,7 @@ func NewHealthyUnit(dataDir string, ip string, fingerPrint string, enableHeadles
 	}, nil
 }
 
-func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) error {
+func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) (domain.ResourceUnit, error) {
 	if u.browser != nil {
 		u.browser.Close()
 	}
@@ -43,9 +43,10 @@ func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) error {
 	u.ipProxy = ip
 	u.fingerPrint = fingerPrint
 	if u.browser, err = chromedpx.NewHealthyBrowser(dataDir, ip, fingerPrint, u.enableHeadless, u.browserPath); err != nil {
-		return err
+		return nil, err
+	} else {
+		return u, nil
 	}
-	return nil
 }
 
 func (u *Unit) Browser() domain.Browser {

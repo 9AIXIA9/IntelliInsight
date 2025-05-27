@@ -9,21 +9,16 @@ type TaskID string
 
 // Task 爬虫任务模型
 type Task struct {
-	Info    *TaskInfo
-	Request *TaskRequest
-}
+	// 任务基本信息
+	ID             TaskID     `bson:"_id"`
+	ParentID       TaskID     `bson:"parent_id,omitempty"` // 未分治任务ParentID为空
+	Status         TaskStatus `bson:"status"`
+	PostsCollected uint32     `bson:"posts_collected"`
+	StartTime      time.Time  `bson:"start_time"`
+	EndTime        time.Time  `bson:"end_time"`
+	Err            error      `bson:"err,omitempty"`
 
-type TaskInfo struct {
-	ID             TaskID    `bson:"id"`
-	ParentID       TaskID    `bson:"parent_id,omitempty"` //未分治任务ParentID就是自己
-	Status         string    `bson:"status"`
-	PostsCollected uint32    `bson:"posts_collected"`
-	Err            error     `bson:"err,omitempty"`
-	StartTime      time.Time `bson:"start_time"`
-	EndTime        time.Time `bson:"end_time"`
-}
-
-type TaskRequest struct {
+	// 任务请求参数
 	Site            proto.Site `bson:"site"`
 	Keyword         string     `bson:"keyword"`
 	PostCount       uint64     `bson:"post_count"`

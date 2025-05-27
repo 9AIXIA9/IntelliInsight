@@ -155,17 +155,23 @@ func (p *Pool) destroyUnit(unit domain.ResourceUnit) {
 }
 
 // 检查 Unit 健康并尝试刷新，若尝试无果则销毁不健康实例
-func (p *Pool) checkAndHandleUnitHealth(unit domain.ResourceUnit) error {
+func (p *Pool) checkAndHandleUnitHealth(unit domain.ResourceUnit) (domain.ResourceUnit, error) {
+	// 首先检查单元是否为空
+	if unit == nil {
+		return nil, errors.New("资源单元为空")
+	}
+
+	//执行健康检查
 	err := p.checkUnitHealth(unit)
 	if err == nil {
-		return nil
+		return unit, nil
 	}
 
 	//不健康则尝试刷新资源
 	var lastErr error
 
 	for i := 0; i < 3; i++ {
-		err := p.Refresh(unit)
+		unit, err := p.Refresh(unit)
 		if err != nil {
 			lastErr = err
 			continue
@@ -176,13 +182,13 @@ func (p *Pool) checkAndHandleUnitHealth(unit domain.ResourceUnit) error {
 			continue
 		}
 
-		return nil
+		return unit, nil
 	}
 
 	//刷新后依旧不健康则放弃该资源 -> 也就是销毁
 	logx.Infof("处理不健康资源单位失败，尝试摧毁")
 	p.destroyUnit(unit)
-	return fmt.Errorf("经过尝试后该资源仍不健康：%w", lastErr)
+	return nil, fmt.Errorf("经过尝试后该资源仍不健康：%w", lastErr)
 }
 
 // 检查 Unit 健康
@@ -217,7 +223,7 @@ func (p *Pool) spotCheckHealth() {
 	for i := 0; i < p.count; i++ {
 		select {
 		case unit := <-p.units:
-			if err := p.checkAndHandleUnitHealth(unit); err != nil {
+			if unit, err := p.checkAndHandleUnitHealth(unit); err != nil {
 				logx.Errorf("资源不健康，且处理出错：%v", err)
 				logx.Infof("放弃该资源")
 				p.destroyUnit(unit)
@@ -232,18 +238,18 @@ func (p *Pool) spotCheckHealth() {
 }
 
 // Refresh 更新资源单元
-func (p *Pool) Refresh(unit domain.ResourceUnit) error {
+func (p *Pool) Refresh(unit domain.ResourceUnit) (domain.ResourceUnit, error) {
 	//资源为空
 	if unit == nil {
-		return errors.New("刷新失败，资源为空")
+		return nil, errors.New("刷新失败，资源为空")
 	}
 
 	dataDir, ip, fingerPrint := p.loadBalanced()
-	if err := unit.Refresh(dataDir, ip, fingerPrint); err != nil {
-		return err
+	if unit, err := unit.Refresh(dataDir, ip, fingerPrint); err != nil {
+		return nil, err
+	} else {
+		return unit, nil
 	}
-
-	return nil
 }
 
 // Get 获取健康资源
@@ -260,7 +266,7 @@ func (p *Pool) Get(ctx context.Context) (domain.ResourceUnit, error) {
 		return nil, ctx.Err()
 	case unit := <-p.units:
 		logx.Debugf("从资源池中获取资源")
-		err := p.checkAndHandleUnitHealth(unit)
+		unit, err := p.checkAndHandleUnitHealth(unit)
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +284,7 @@ func (p *Pool) Get(ctx context.Context) (domain.ResourceUnit, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case unit := <-p.units:
-			err := p.checkAndHandleUnitHealth(unit)
+			unit, err := p.checkAndHandleUnitHealth(unit)
 			if err != nil {
 				return nil, err
 			}
@@ -293,15 +299,15 @@ func (p *Pool) Put(unit domain.ResourceUnit) {
 
 	threading.GoSafe(func() {
 		//检查资源是否正常
-		if err := p.checkAndHandleUnitHealth(unit); err != nil {
+		if unit, err := p.checkAndHandleUnitHealth(unit); err != nil {
 			//不正常的资源销毁他
 			p.destroyUnit(unit)
-			logx.Errorf("释放的资源有误：%v", err)
+			logx.Errorf("`释放的资源有误：%v", err)
 			return
 		}
 
 		//正常的资源放回池中
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		select {
 		case p.units <- unit:

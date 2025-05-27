@@ -46,17 +46,17 @@ func (l *StartCrawlLogic) StartCrawl(in *proto.CrawlRequest) (*proto.CrawlRespon
 	err := l.svcCtx.TaskQueue.AddTask(task)
 	if err != nil {
 		return &proto.CrawlResponse{
-			TaskId:  string(task.Info.ID),
+			TaskId:  string(task.ID),
 			Success: false,
 			Message: err.Error(),
 		}, err
 	}
 
 	l.Logger.Infof("启动新爬虫任务: %s, 关键词: %s, 页数: %d",
-		task.Info.ID, in.Keyword, in.PostCount)
+		task.ID, in.Keyword, in.PostCount)
 
 	return &proto.CrawlResponse{
-		TaskId:  string(task.Info.ID),
+		TaskId:  string(task.ID),
 		Success: true,
 		Message: "任务已成功提交",
 	}, nil

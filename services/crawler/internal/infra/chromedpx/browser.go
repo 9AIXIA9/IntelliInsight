@@ -61,6 +61,8 @@ func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHead
 }
 
 func (b *Browser) CheckHealth() error {
+	b.mutex.Lock()
+	b.mutex.Unlock()
 	// 使用页面状态检查
 	var result bool
 	err := chromedp.Run(b.ctx, chromedp.Evaluate(`document.readyState === "complete"`, &result))

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Repository MongoDB仓库实现
@@ -25,23 +26,35 @@ func NewRepository(client *mongo.Client, database string, postCollection, commen
 	}
 }
 
+// SaveTask 保存任务，如果ID已存在则更新，不存在则插入
 func (r *Repository) SaveTask(ctx context.Context, task *domain.Task) error {
 	if task == nil {
 		return errors.New("任务为空")
 	}
 
-	// 检查任务是否已存在
-	filter := bson.M{"_id": task.Info.ID}
-	count, err := r.taskCollection.CountDocuments(ctx, filter)
-	if err != nil {
-		return err
+	// 处理错误字段
+	var taskDoc interface{} = task
+	if task.Err != nil {
+		// 创建带错误字符串的文档副本
+		doc := bson.D{}
+		bytes, err := bson.Marshal(task)
+		if err != nil {
+			return err
+		}
+
+		if err := bson.Unmarshal(bytes, &doc); err != nil {
+			return err
+		}
+
+		// 附加错误字符串
+		doc = append(doc, bson.E{Key: "err", Value: task.Err.Error()})
+		taskDoc = doc
 	}
 
-	if count > 0 {
-		return errors.New("任务ID已存在")
-	}
-
-	_, err = r.taskCollection.InsertOne(ctx, task)
+	// 使用upsert选项，存在则更新，不存在则插入
+	filter := bson.M{"_id": task.ID}
+	opts := options.Replace().SetUpsert(true)
+	_, err := r.taskCollection.ReplaceOne(ctx, filter, taskDoc, opts)
 	return err
 }
 

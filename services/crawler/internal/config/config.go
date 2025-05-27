@@ -38,6 +38,7 @@ type TaskQueue struct {
 	WorkQueueSize    int
 	MaxWorkers       int
 	MaxTaskCacheSize int
+	DivideThreshold  uint64
 }
 
 type Resource struct {

@@ -11,7 +11,7 @@ type ResourceUnit interface {
 	IP() string
 	Fingerprint() string
 	DataDir() string
-	Refresh(dataDir string, ip string, fingerPrint string) error
+	Refresh(dataDir string, ip string, fingerPrint string) (ResourceUnit, error)
 	CheckHealth() error
 	Close()
 }
@@ -20,7 +20,7 @@ type ResourceUnit interface {
 type ResourcePool interface {
 	Get(ctx context.Context) (ResourceUnit, error)
 	Put(ResourceUnit)
-	Refresh(ResourceUnit) error
+	Refresh(ResourceUnit) (ResourceUnit, error)
 	LoadBalancingStrategy() LoadBalancingStrategy
 	AsyncHealthCheck(interval time.Duration)
 	Close(ctx context.Context)

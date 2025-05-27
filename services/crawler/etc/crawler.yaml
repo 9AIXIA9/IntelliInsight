@@ -27,6 +27,7 @@ TaskQueue:
   WorkQueueSize: ${TASK_QUEUE_WORK_QUEUE_SIZE}
   MaxWorkers: ${TASK_QUEUE_MAX_WORKERS}
   MaxTaskCacheSize: ${TASK_QUEUE_MAX_CACHE}
+  DivideThreshold: ${TASK_DIVIDE_THRESHOLD}
 
 Resource:
   DataBasePath: ${RESOURCE_DATA_BASE_PATH}

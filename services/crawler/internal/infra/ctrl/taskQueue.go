@@ -6,7 +6,6 @@ import (
 	"crawler/internal/domain"
 	"crawler/internal/infra/crawler"
 	"crawler/internal/infra/site"
-	"crawler/internal/infra/utils/snowflake"
 	"errors"
 	"fmt"
 	"sync"
@@ -18,19 +17,22 @@ import (
 
 // TaskQueue 任务队列实现
 type TaskQueue struct {
-	repo         domain.Repository   // MongoDB存储仓库
-	filter       domain.Filter       //过滤器
-	resourcePool domain.ResourcePool //资源池
-	crawler      domain.Crawler      //爬虫
+	// 依赖项
+	repo         domain.Repository
+	filter       domain.Filter
+	resourcePool domain.ResourcePool
+	crawler      domain.Crawler
 
+	// 配置项
 	divideThreshold uint64
 
-	mutex      sync.RWMutex      // 读写锁
-	taskChan   chan *domain.Task // 任务通道(生产者到消费者)
-	workerPool chan struct{}     // 工作池控制并发
-	stopChan   chan struct{}     // 停止信号通道
-	waitGroup  sync.WaitGroup    // 等待所有工作完成
-	isRunning  bool              //运行状态
+	// 并发控制
+	mutex      sync.RWMutex
+	taskChan   chan *domain.Task
+	workerPool chan struct{}
+	stopChan   chan struct{}
+	waitGroup  sync.WaitGroup
+	isRunning  bool
 }
 
 // NewTaskQueue 创建爬虫任务队列
@@ -40,17 +42,22 @@ func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, filter domain.
 	}
 
 	tq := &TaskQueue{
-		repo:            repo,
-		filter:          filter,
-		resourcePool:    resourcePool,
-		crawler:         crawler.NewCrawler(),
-		divideThreshold: 10,
-		mutex:           sync.RWMutex{},
-		taskChan:        make(chan *domain.Task, conf.MaxTaskCacheSize),
-		workerPool:      make(chan struct{}, conf.MaxWorkers),
-		stopChan:        make(chan struct{}),
-		waitGroup:       sync.WaitGroup{},
-		isRunning:       true,
+		// 依赖项初始化
+		repo:         repo,
+		filter:       filter,
+		resourcePool: resourcePool,
+		crawler:      crawler.NewCrawler(),
+
+		// 配置项初始化
+		divideThreshold: conf.DivideThreshold,
+
+		// 并发控制初始化
+		mutex:      sync.RWMutex{},
+		taskChan:   make(chan *domain.Task, conf.MaxTaskCacheSize),
+		workerPool: make(chan struct{}, conf.MaxWorkers),
+		stopChan:   make(chan struct{}),
+		waitGroup:  sync.WaitGroup{},
+		isRunning:  true,
 	}
 
 	// 启动消费者调度器
@@ -59,57 +66,20 @@ func NewTaskQueue(conf *config.TaskQueue, repo domain.Repository, filter domain.
 	return tq
 }
 
-// AddTask 【生产者】添加新任务到队列
+// AddTask 添加新任务到队列
 func (tq *TaskQueue) AddTask(task *domain.Task) error {
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
+	// 任务完成后保存
+	defer tq.persistTask(task)
 
-		if err := tq.repo.SaveTask(ctx, task); err != nil {
-			logx.Errorf("保存任务失败：%v", err)
-		}
-	}()
+	logx.Infof("收到任务：%v", task.ID)
 
-	logx.Infof("收到任务：%v", task.Info.ID)
-
+	// 检查是否需要分治
 	if tq.NeedToDivide(task) {
-		logx.Debugf("任务过大，进行分治：%v", task.Info.ID)
-		subTasks := tq.Divide(task)
-
-		// 发送子任务到任务通道（如果队列在运行）
-		tq.mutex.Lock()
-		if tq.isRunning {
-			for _, subTask := range subTasks {
-				tq.taskChan <- subTask
-			}
-			tq.mutex.Unlock()
-
-			task.Info.Status = domain.StatusDivided.String()
-			return nil
-		}
-
-		tq.mutex.Unlock()
-
-		task.Info.Status = domain.StatusFailed.String()
-		task.Info.Err = errors.New("任务队列未运行")
-		return task.Info.Err
+		return tq.handleDivideTask(task)
 	}
 
-	// 发送单个任务到任务通道（如果队列在运行）
-	tq.mutex.Lock()
-	if tq.isRunning {
-		tq.taskChan <- task
-		tq.mutex.Unlock()
-
-		task.Info.Status = domain.StatusPending.String()
-
-		return nil
-	}
-
-	tq.mutex.Unlock()
-	task.Info.Status = domain.StatusFailed.String()
-	task.Info.Err = errors.New("任务队列未运行")
-	return task.Info.Err
+	// 发送常规任务
+	return tq.sendTaskToQueue(task)
 }
 
 // Stop 停止任务队列处理
@@ -131,7 +101,56 @@ func (tq *TaskQueue) Stop(ctx context.Context) {
 	tq.resourcePool.Close(ctx)
 }
 
-// Dispatcher 【消费者】调度器 - 负责分配任务给工作协程
+// 持久化保存任务
+func (tq *TaskQueue) persistTask(task *domain.Task) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := tq.repo.SaveTask(ctx, task); err != nil {
+		logx.Errorf("保存任务失败：%v", err)
+	}
+}
+
+// 处理需要分治的任务
+func (tq *TaskQueue) handleDivideTask(task *domain.Task) error {
+	logx.Debugf("任务过大，进行分治：%v", task.ID)
+	subTasks := tq.DivideTask(task)
+
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+
+	if !tq.isRunning {
+		task.Status = domain.StatusFailed
+		task.Err = errors.New("任务队列未运行")
+		return task.Err
+	}
+
+	// 发送子任务到任务通道
+	for _, subTask := range subTasks {
+		tq.taskChan <- subTask
+	}
+
+	task.Status = domain.StatusDivided
+	return nil
+}
+
+// 发送任务到队列
+func (tq *TaskQueue) sendTaskToQueue(task *domain.Task) error {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+
+	if !tq.isRunning {
+		task.Status = domain.StatusFailed
+		task.Err = errors.New("任务队列未运行")
+		return task.Err
+	}
+
+	tq.taskChan <- task
+	task.Status = domain.StatusPending
+	return nil
+}
+
+// Dispatcher 调度器 - 负责分配任务给工作协程
 func (tq *TaskQueue) Dispatcher() {
 	for {
 		select {
@@ -143,19 +162,17 @@ func (tq *TaskQueue) Dispatcher() {
 			// 启动worker处理任务
 			threading.GoSafe(func() {
 				defer func() {
-					// 释放worker槽位
-					<-tq.workerPool
+					<-tq.workerPool // 释放worker槽位
 					tq.waitGroup.Done()
 				}()
 
-				//分治子任务
-				if task.Info.ParentID != "" || task.Info.Status == domain.StatusDivided.String() {
-					tq.ProcessSubTask(task)
+				task.Status = domain.StatusRunning
+
+				if task.ParentID != "" || task.Status == domain.StatusDivided {
+					tq.processSubTask(task)
 				} else {
-					//正常任务
 					tq.ProcessTask(task)
 				}
-
 			})
 
 		case <-tq.stopChan:
@@ -164,164 +181,219 @@ func (tq *TaskQueue) Dispatcher() {
 	}
 }
 
-// ProcessTask 处理单个任务的逻辑
+// ProcessTask 处理单个任务
 func (tq *TaskQueue) ProcessTask(task *domain.Task) {
-	//状态处理
-	task.Info.StartTime = time.Now()
+	task.StartTime = time.Now()
+
 	defer func() {
-		task.Info.EndTime = time.Now()
-		if task.Info.Err != nil {
-			task.Info.Status = domain.StatusFailed.String()
-		} else {
-			task.Info.Status = domain.StatusCompleted.String()
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
-		if err := tq.repo.SaveTask(ctx, task); err != nil {
-			logx.Errorf("保存任务失败:%v", err)
-		}
+		tq.finalizeTask(task)
 	}()
 
-	s, err := site.Convert(task.Request.Site)
+	// 1. 转换站点配置
+	s, err := tq.prepareSite(task)
 	if err != nil {
-		task.Info.Err = fmt.Errorf("转换站点错误:%w", err)
-		logx.Error(task.Info.Err)
+		task.Err = err
 		return
 	}
 
-	// 从池获取资源
+	// 2. 获取爬虫资源
+	resource, err := tq.acquireResource(task)
+	if err != nil {
+		task.Err = err
+		return
+	}
+
+	if resource == nil {
+		task.Err = errors.New("获取资源为空")
+		logx.Errorf("获取资源为空，但是未报错")
+		return
+	}
+
+	defer tq.resourcePool.Put(resource)
+
+	// 3. 爬取帖子链接
+	links, err := tq.collectLinks(resource, s, task)
+	if err != nil {
+		task.Err = err
+		return
+	}
+
+	// 4. 爬取帖子详情
+	posts := tq.collectPosts(resource, s, links, task)
+
+	// 5. 保存爬取结果
+	tq.saveCrawlResults(task, posts)
+}
+
+// processSubTask 处理子任务
+func (tq *TaskQueue) processSubTask(task *domain.Task) {
+	tq.ProcessTask(task)
+
+	if err := tq.UpdateParentTaskProgress(task); err != nil {
+		logx.Errorf("完成子任务：%v - %v, 但更新父任务进度失败: %v", task.ID, task.ParentID, err)
+	}
+}
+
+// 准备站点配置
+func (tq *TaskQueue) prepareSite(task *domain.Task) (domain.Site, error) {
+	s, err := site.Convert(task.Site)
+	if err != nil {
+		return nil, fmt.Errorf("转换站点错误: %w", err)
+	}
+	return s, nil
+}
+
+// 获取爬虫资源
+func (tq *TaskQueue) acquireResource(task *domain.Task) (domain.ResourceUnit, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	resource, err := tq.resourcePool.Get(ctx)
 	if err != nil {
-		task.Info.Err = fmt.Errorf("无法获取资源实例:%w", err)
-		logx.Error(task.Info.Err)
-		return
+		if errors.Is(err, context.DeadlineExceeded) {
+			// 超时获取不到资源则重新进入队列等待
+			task.Status = domain.StatusPending
+			if err = tq.AddTask(task); err != nil {
+				return nil, fmt.Errorf("获取资源失败且无法重新加入队列：%w", task.Err)
+			}
+			return nil, err
+		}
+		return nil, fmt.Errorf("无法获取资源实例: %w", err)
 	}
-	// 确保使用完后归还浏览器
-	defer tq.resourcePool.Put(resource)
 
-	startTime := time.Now()
+	// 资源非空检查
+	if resource == nil {
+		task.Status = domain.StatusPending
+		task.Err = errors.New("获取到空资源")
+		if err = tq.AddTask(task); err != nil {
+			return nil, fmt.Errorf("获取到空资源且无法重新加入队列")
+		}
+		return nil, task.Err
+	}
 
-	// 搜索关键词，获取帖子链接列表
-	logx.Infof("开始收集到帖子链接")
+	return resource, nil
+}
 
-	links, err := tq.crawler.CollectPostLinks(resource.Browser(), tq.filter, s, task.Request.Keyword, task.Request.PostCount, task.Request.MinLikes)
+// 收集帖子链接
+func (tq *TaskQueue) collectLinks(resource domain.ResourceUnit, s domain.Site, task *domain.Task) ([]string, error) {
+	logx.Infof("开始收集帖子链接")
+	links, err := tq.crawler.CollectPostLinks(
+		resource.Browser(),
+		tq.filter,
+		s,
+		task.Keyword,
+		task.PostCount,
+		task.MinLikes,
+	)
+
 	if err != nil {
-		task.Info.Err = fmt.Errorf("收集帖子链接失败：%w", err)
-		logx.Error(task.Info.Err)
-		return
+		return nil, fmt.Errorf("收集帖子链接失败：%w", err)
 	}
 
 	logx.Debugf("成功收集到 %d 个帖子链接", len(links))
+	return links, nil
+}
 
+// 收集帖子详情
+func (tq *TaskQueue) collectPosts(resource domain.ResourceUnit, s domain.Site, links []string, task *domain.Task) []*domain.Post {
 	posts := make([]*domain.Post, 0, len(links))
 
 	for i, link := range links {
 		logx.Debugf("开始爬取第 %d/%d 个帖子: %s", i+1, len(links), link)
 
 		post, err := tq.crawler.CollectPostDetail(resource.Browser(), s, link, &domain.CollectPostDetailOption{
-			IncludeComments: task.Request.IncludeComments,
-			IncludeImages:   task.Request.IncludeImages,
-			CommentsPerPost: task.Request.CommentsPerPost,
-			MinLikes:        task.Request.MinLikes,
+			IncludeComments: task.IncludeComments,
+			IncludeImages:   task.IncludeImages,
+			CommentsPerPost: task.CommentsPerPost,
+			MinLikes:        task.MinLikes,
 		})
+
 		if err != nil {
 			logx.Errorf("收集%v帖子时出错：%v", link, err)
 			continue
 		}
 
 		posts = append(posts, post)
-		task.Info.PostsCollected++
+		task.PostsCollected++
 
 		logx.Infof("成功爬取帖子: %s, 标题: %s", link, post.Title)
 	}
 
-	elapsedTime := time.Since(startTime)
-	logx.Infof("爬虫任务完成，共爬取 %d 个帖子，耗时: %v", len(links), elapsedTime)
+	return posts
+}
 
-	// 保存爬取结果到MongoDB
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+// 保存爬取结果
+func (tq *TaskQueue) saveCrawlResults(task *domain.Task, posts []*domain.Post) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := tq.repo.SavePostsAndComments(ctx, task.Info.ID, posts); err != nil {
+	taskID := task.ID
+	if task.ParentID != "" {
+		taskID = task.ParentID
+	}
+
+	if err := tq.repo.SavePostsAndComments(ctx, taskID, posts); err != nil {
 		logx.Errorf("保存爬取帖子到MongoDB失败: %v", err)
 	}
 }
 
-// ProcessSubTask 处理单个分治任务的逻辑
-func (tq *TaskQueue) ProcessSubTask(SubTask *domain.Task) {
-	tq.ProcessTask(SubTask)
-
-	if err := tq.UpdateProgress(SubTask); err != nil {
-		logx.Errorf("完成子任务：%v - %v,但更新任务错误:%v", SubTask.Info.ID, SubTask.Info.ParentID, err)
+// finalizeTask 完成任务时的处理
+func (tq *TaskQueue) finalizeTask(task *domain.Task) {
+	if task.Status == domain.StatusPending {
+		logx.Infof("任务%v重新加入队列", task.ID)
+		return
 	}
-}
 
-func (tq *TaskQueue) NeedToDivide(task *domain.Task) bool {
-	return task.Request.PostCount > tq.divideThreshold
-}
-
-func (tq *TaskQueue) Divide(task *domain.Task) (subTasks []*domain.Task) {
-	n := task.Request.PostCount / tq.divideThreshold
-	if remaining := task.Request.PostCount % tq.divideThreshold; remaining == 0 {
-		subTasks = make([]*domain.Task, 0, n)
+	task.EndTime = time.Now()
+	if task.Err != nil {
+		task.Status = domain.StatusFailed
 	} else {
-		subTasks = make([]*domain.Task, 0, n+1)
-
-		subTasks = append(subTasks, &domain.Task{
-			Info: &domain.TaskInfo{
-				ID:             snowflake.GenerateID(),
-				ParentID:       task.Info.ID,
-				Status:         domain.StatusDivided.String(),
-				PostsCollected: 0,
-				Err:            nil,
-				StartTime:      time.Time{},
-				EndTime:        time.Time{},
-			},
-			Request: &domain.TaskRequest{
-				Site:            task.Request.Site,
-				Keyword:         task.Request.Keyword,
-				PostCount:       remaining,
-				MinLikes:        task.Request.MinLikes,
-				CommentMinLikes: task.Request.CommentMinLikes,
-				CommentsPerPost: task.Request.CommentsPerPost,
-				IncludeComments: task.Request.IncludeComments,
-				IncludeImages:   task.Request.IncludeImages,
-			},
-		})
+		task.Status = domain.StatusCompleted
 	}
 
-	for i := 0; i < int(n); i++ {
-		subTasks = append(subTasks, &domain.Task{
-			Info: &domain.TaskInfo{
-				ID:             snowflake.GenerateID(),
-				ParentID:       task.Info.ID,
-				Status:         domain.StatusDivided.String(),
-				PostsCollected: 0,
-				Err:            nil,
-				StartTime:      time.Time{},
-				EndTime:        time.Time{},
-			},
-			Request: &domain.TaskRequest{
-				Site:            task.Request.Site,
-				Keyword:         task.Request.Keyword,
-				PostCount:       tq.divideThreshold,
-				MinLikes:        task.Request.MinLikes,
-				CommentMinLikes: task.Request.CommentMinLikes,
-				CommentsPerPost: task.Request.CommentsPerPost,
-				IncludeComments: task.Request.IncludeComments,
-				IncludeImages:   task.Request.IncludeImages,
-			},
-		})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := tq.repo.SaveTask(ctx, task); err != nil {
+		logx.Errorf("保存任务失败: %v", err)
 	}
+}
+
+// NeedToDivide 是否需要分治
+func (tq *TaskQueue) NeedToDivide(task *domain.Task) bool {
+	return task.PostCount > tq.divideThreshold
+}
+
+// DivideTask 分治任务 - 均匀分配方式
+func (tq *TaskQueue) DivideTask(task *domain.Task) []*domain.Task {
+	//todo 看不懂
+	//  计算需要多少个子任务（向上取整，确保每个子任务大小不超过阈值）
+	n := (task.PostCount + tq.divideThreshold - 1) / tq.divideThreshold
+
+	// 计算基本大小（向下取整）
+	baseSize := task.PostCount / n
+
+	// 计算有多少剩余的需要+1分配
+	remainder := task.PostCount % n
+
+	subTasks := make([]*domain.Task, 0, n)
+
+	// 创建子任务，前remainder个任务大小为 baseSize +1，其余为 baseSize
+	for i := uint64(0); i < n; i++ {
+		taskSize := baseSize
+		if i < remainder {
+			taskSize++
+		}
+		subTasks = append(subTasks, createSubTask(task, taskSize))
+	}
+
+	logx.Debugf("task:%v 分治为%v个大小为%v、%v+1的子任务", task.ID, n, baseSize, baseSize)
 
 	return subTasks
 }
 
-func (tq *TaskQueue) UpdateProgress(task *domain.Task) error {
+// UpdateParentTaskProgress 更新父任务进度
+func (tq *TaskQueue) UpdateParentTaskProgress(task *domain.Task) error {
+	// TODO: 实现更新父任务进度的逻辑
 	return nil
 }

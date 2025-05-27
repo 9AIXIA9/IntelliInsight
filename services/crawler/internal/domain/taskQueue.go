@@ -15,10 +15,10 @@ type TaskQueue interface {
 }
 
 type Divider interface {
-	NeedToDivide(task *Task) bool //判断是否需要分治
-	Divide(task *Task) []*Task    //返回小任务
+	NeedToDivide(task *Task) bool  //判断是否需要分治
+	DivideTask(task *Task) []*Task //返回小任务
 }
 
 type Merger interface {
-	UpdateProgress(task *Task) error
+	UpdateParentTaskProgress(task *Task) error
 }
