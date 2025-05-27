@@ -46,22 +46,27 @@ MongoDB作为中间层实现数据交换
 1. 分析解构小红书网页组成，整理成数据结构（domain文件）
 
    ```go
-	  package domain
+   package domain
    
    import (
+	   "crawler/proto"
 	   "time"
    )
    
+   type TaskID string
+   
    // Task 爬虫任务模型
    type Task struct {
-	   ID             string    `bson:"_id"`
-	   StartTime      time.Time `bson:"start_time"`
-	   EndTime        time.Time `bson:"end_time"`
-	   Status         string    `bson:"status"`
-	   PostsCollected uint32    `bson:"posts_collected"`
-	   Err            error     `bson:"err,omitempty"`
+	   // 任务基本信息
+	   ID             TaskID     `bson:"_id"`
+	   ParentID       TaskID     `bson:"parent_id,omitempty"` // 未分治任务ParentID为空
+	   Status         TaskStatus `bson:"status"`
+	   PostsCollected uint32     `bson:"posts_collected"`
+	   StartTime      time.Time  `bson:"start_time"`
+	   EndTime        time.Time  `bson:"end_time"`
+	   Err            error      `bson:"err,omitempty"`
 	   
-	   // CrawlRequest字段展平
+	   // 任务请求参数
 	   Site            proto.Site `bson:"site"`
 	   Keyword         string     `bson:"keyword"`
 	   PostCount       uint64     `bson:"post_count"`
@@ -71,6 +76,17 @@ MongoDB作为中间层实现数据交换
 	   IncludeComments bool       `bson:"include_comments"`
 	   IncludeImages   bool       `bson:"include_images"`
    }
+   
+   // TaskStatus 任务状态
+   type TaskStatus int
+   
+   const (
+	   StatusCompleted TaskStatus = iota
+	   StatusFailed
+	   StatusRunning
+	   StatusPending
+	   StatusDivided //分治
+   )
    
    // Post 帖子模型
    type Post struct {
@@ -120,7 +136,7 @@ MongoDB作为中间层实现数据交换
    //
    //	LikeCount uint64
    //}
-   ```
+	```
 
 2. 并发爬虫设计：
 	- 优势：当sleep或者阻塞时（尤其在反爬机制实现时，go能够高效并发，所以适合做并发爬虫），及时让出CPU以及其余资源的占有，提高资源利用率
@@ -144,7 +160,7 @@ MongoDB作为中间层实现数据交换
 - ~~重新设计存储模式，发挥MongoDB的特性（横向扩展）~~
 - 扩展Python-APP的交互功能
 - ~~完成手机验证码自动登录 -> 无法实现~~
-  实现此功能需要 虚拟手机号API+自动化脚本 或 使用本机号码 + 转发短信服务 风险过高
+  实现此功能需要 虚拟手机号API+自动化脚本 或 使用本机号码 + 转发·短信服务 风险过高
   使用手动扫码替代此功能
 - ~~分治处理多站点及大任务~~
 - 架构宏观扩展
@@ -156,11 +172,11 @@ MongoDB作为中间层实现数据交换
 	1. 规模 · 根据任务大小进行分治 如数据量为1000的任务分为5个200的小任务，分配到协程中运行
 	2. 来源 · 根据任务需求爬取不同站点 如一个协程爬取小红书一个爬取知乎
 - 设计
-	1. TaskQueue中的更改
-		- 修改AddTask方法的逻辑 - 添加任务时判断任务规模，保证时间局部性，防止子任务排队相隔
-		- Dispatcher()任务调度器 - 添加一个分支用于处理子任务
-		- 重构ProcessTask - 抽离公用逻辑作为函数而不是方法 能够完成SubTask和Task子任务和完整的任务
-	2.
+	- 修改AddTask方法的逻辑 - 添加任务时判断任务规模，保证时间局部性，防止子任务排队相隔
+	- Dispatcher()任务调度器 - 添加一个分支用于处理子任务
+	- 重构ProcessTask - 抽离公用逻辑作为函数而不是方法 能够完成SubTask和Task子任务和完整的任务
+	- 添加ProcessSubTask - 调用ProcessTask 完成后再添加处理子任务结果的逻辑
+	- 继承Divider和Merger - 对划分子任务 合并子任务结果
 
 ### 架构宏观扩展方向
 
