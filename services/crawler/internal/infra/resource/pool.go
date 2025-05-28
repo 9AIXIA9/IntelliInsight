@@ -19,21 +19,24 @@ import (
 const (
 	maxRetries = 10
 	maxCount   = 20
+	spotNum    = 5
 )
 
 type Pool struct {
 	units chan domain.ResourceUnit //根据状态操作
 
-	stop      chan struct{}
-	count     int
-	countMu   sync.Mutex
-	isRunning bool
-	runningMu sync.RWMutex
+	stop          chan struct{}
+	count         int
+	countMu       sync.Mutex
+	isRunning     bool
+	runningMu     sync.RWMutex
+	freeDataDirMu sync.Mutex
+	freeDataDirs  []string //用于存储空闲的数据目录
 
 	strategy     domain.LoadBalancingStrategy
 	roundIdx     atomic.Uint32
 	ips          []string
-	dataDirs     []string
+	dataDirs     []string //用于存储所有读取到的数据目录
 	fingerPrints []string
 	maxSize      int
 	browserPath  string
@@ -54,20 +57,22 @@ func MustNewResourcePool(conf config.Resource) domain.ResourcePool {
 	}
 
 	pool := &Pool{
-		units:        make(chan domain.ResourceUnit, conf.MaxPoolSize),
-		stop:         make(chan struct{}),
-		count:        0,
-		countMu:      sync.Mutex{},
-		isRunning:    true,
-		runningMu:    sync.RWMutex{},
-		strategy:     conf.LoadBalancingStrategy,
-		roundIdx:     atomic.Uint32{},
-		ips:          conf.IPs,
-		dataDirs:     make([]string, conf.MaxPoolSize),
-		fingerPrints: make([]string, conf.MaxPoolSize),
-		maxSize:      conf.MaxPoolSize,
-		browserPath:  conf.BrowserPath,
-		headless:     conf.Headless,
+		units:         make(chan domain.ResourceUnit, conf.MaxPoolSize),
+		stop:          make(chan struct{}),
+		count:         0,
+		countMu:       sync.Mutex{},
+		isRunning:     true,
+		runningMu:     sync.RWMutex{},
+		freeDataDirMu: sync.Mutex{},
+		freeDataDirs:  make([]string, conf.MaxPoolSize),
+		strategy:      conf.LoadBalancingStrategy,
+		roundIdx:      atomic.Uint32{},
+		ips:           conf.IPs,
+		dataDirs:      make([]string, conf.MaxPoolSize),
+		fingerPrints:  make([]string, conf.MaxPoolSize),
+		maxSize:       conf.MaxPoolSize,
+		browserPath:   conf.BrowserPath,
+		headless:      conf.Headless,
 	}
 
 	if len(conf.FingerPrints) == 0 {
@@ -123,14 +128,23 @@ func (p *Pool) createHealthyUnit() (domain.ResourceUnit, error) {
 
 	//获取健康单元
 	p.countMu.Lock()
-	if p.count >= p.maxSize {
+	//不能超过浏览器目录数目
+	if p.count >= p.maxSize || p.count >= len(p.dataDirs) {
 		p.countMu.Unlock()
 		return nil, errors.New("资源池已达最大数目")
 	}
 	p.count++ // 先增加计数
 	p.countMu.Unlock()
 
-	dataDir, ip, fingerPrint := p.loadBalanced()
+	//浏览器目录相同的话将操作一个浏览器网页
+
+	//负载均衡地获取资源
+	dataDir, ip, fingerPrint, err := p.loadBalanced()
+	if err != nil {
+		return nil, err
+	}
+
+	//创建新的资源单元
 	unit, err := NewHealthyUnit(dataDir, ip, fingerPrint, p.headless, p.browserPath)
 	if err != nil {
 		// 创建失败时减少计数
@@ -220,7 +234,7 @@ func (p *Pool) AsyncHealthCheck(interval time.Duration) {
 // spotCheckHealth 抽样检查单元健康
 func (p *Pool) spotCheckHealth() {
 	//抽样检查 保证系统可用性
-	for i := 0; i < p.count; i++ {
+	for i := 0; i < spotNum; i++ {
 		select {
 		case unit := <-p.units:
 			if unit, err := p.checkAndHandleUnitHealth(unit); err != nil {
@@ -244,7 +258,13 @@ func (p *Pool) Refresh(unit domain.ResourceUnit) (domain.ResourceUnit, error) {
 		return nil, errors.New("刷新失败，资源为空")
 	}
 
-	dataDir, ip, fingerPrint := p.loadBalanced()
+	//负载均衡地获取资源
+	dataDir, ip, fingerPrint, err := p.loadBalanced()
+	if err != nil {
+		return nil, err
+	}
+
+	//刷新资源单元
 	if unit, err := unit.Refresh(dataDir, ip, fingerPrint); err != nil {
 		return nil, err
 	} else {
@@ -336,19 +356,17 @@ func (p *Pool) Close(ctx context.Context) {
 	logx.Info("正在关闭资源池...")
 
 	// 关闭所有资源，带超时保护
-	timeout := time.After(10 * time.Second)
-	closed := 0
+	timeout := time.After(2 * time.Minute)
 
-	for closed < p.count {
+	for p.count > 0 {
 		select {
 		case unit := <-p.units:
-			unit.Close()
-			closed++
+			p.destroyUnit(unit)
 		case <-timeout:
-			logx.Errorf("关闭资源池超时，已关闭 %d/%d 个资源", closed, p.count)
+			logx.Errorf("关闭资源池超时，剩余%v个资源未关闭", p.count)
 			return
 		case <-ctx.Done():
-			logx.Errorf("关闭资源池被取消，已关闭 %d/%d 个资源", closed, p.count)
+			logx.Errorf("关闭资源池被取消，剩余%v个资源未关闭", p.count)
 			return
 		}
 	}
@@ -363,19 +381,34 @@ func (p *Pool) LoadBalancingStrategy() domain.LoadBalancingStrategy {
 }
 
 // 负载均衡策略
-func (p *Pool) loadBalanced() (dataDir string, ip string, fingerPrint string) {
+func (p *Pool) loadBalanced() (dataDir string, ip string, fingerPrint string, err error) {
+	p.freeDataDirMu.Lock()
+	defer p.freeDataDirMu.Unlock()
+
+	var dataDirIdx, ipIdx, fingerPrintIdx = 0, 0, 0
 	switch p.strategy {
 	case domain.Random:
-		return loadBalancing.GetRandomly3(p.dataDirs, p.ips, p.fingerPrints)
+		dataDirIdx, ipIdx, fingerPrintIdx, err = loadBalancing.GetIndexesRandomly3(p.freeDataDirs, p.ips, p.fingerPrints)
 	case domain.Round:
-		return loadBalancing.GetByRound3(p.roundIdx.Add(1), p.dataDirs, p.ips, p.fingerPrints)
+		dataDirIdx, ipIdx, fingerPrintIdx, err = loadBalancing.GetIndexesByRound3(p.roundIdx.Add(1), p.freeDataDirs, p.ips, p.fingerPrints)
 	default:
-		return loadBalancing.GetRandomly3(p.dataDirs, p.ips, p.fingerPrints)
+		dataDirIdx, ipIdx, fingerPrintIdx, err = loadBalancing.GetIndexesRandomly3(p.freeDataDirs, p.ips, p.fingerPrints)
 	}
+
+	if err != nil {
+		return "", "", "", err
+	}
+
+	dataDir = p.freeDataDirs[dataDirIdx]
+
+	p.freeDataDirs = append(p.freeDataDirs[:dataDirIdx], p.freeDataDirs[dataDirIdx+1:]...)
+
+	return dataDir, p.ips[ipIdx], p.fingerPrints[fingerPrintIdx], nil
 }
 
 // 获取该路径下的子文件夹路径
 func (p *Pool) loadDataCatalog(basePath string) error {
+	logx.Debugf("加载%v的子目录中", basePath)
 	// 确保基础路径存在
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
 		err := os.MkdirAll(basePath, 0755)
@@ -421,5 +454,6 @@ func (p *Pool) loadDataCatalog(basePath string) error {
 		p.dataDirs[count] = dirPath
 		count++
 	}
+	copy(p.freeDataDirs, p.dataDirs)
 	return nil
 }

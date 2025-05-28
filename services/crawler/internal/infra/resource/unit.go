@@ -34,6 +34,7 @@ func NewHealthyUnit(dataDir string, ip string, fingerPrint string, enableHeadles
 }
 
 func (u *Unit) Refresh(dataDir string, ip string, fingerPrint string) (domain.ResourceUnit, error) {
+	logx.Debugf("刷新资源单位")
 	if u.browser != nil {
 		u.browser.Close()
 	}
@@ -77,6 +78,7 @@ func (u *Unit) CheckHealth() error {
 }
 
 func (u *Unit) Close() {
+	logx.Debugf("关闭资源单位")
 	if u.browser != nil {
 		u.browser.Close()
 	}

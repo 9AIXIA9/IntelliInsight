@@ -19,8 +19,6 @@ type Browser struct {
 }
 
 func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHeadless bool, browserPath string) (domain.Browser, error) {
-	parentCtx := context.Background()
-
 	logx.Debugf("初始化浏览器: 数据目录=%s, 代理IP=%s", dataDir, ip)
 
 	// 确保数据目录存在
@@ -33,7 +31,7 @@ func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHead
 	opts := getOptions(dataDir, ip, fingerPrint, enableHeadless, browserPath)
 
 	// 创建新的执行分配器
-	ctx, cancel := chromedp.NewExecAllocator(parentCtx, opts...)
+	ctx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 
 	// 创建浏览器上下文，添加日志记录
 	browserCtx, browserCancel := chromedp.NewContext(
@@ -57,17 +55,17 @@ func NewHealthyBrowser(dataDir string, ip string, fingerPrint string, enableHead
 	if err := browser.CheckHealth(); err != nil {
 		return nil, err
 	}
+
 	return browser, nil
 }
 
 func (b *Browser) CheckHealth() error {
 	b.mutex.Lock()
-	b.mutex.Unlock()
+	defer b.mutex.Unlock()
 	// 使用页面状态检查
 	var result bool
 	err := chromedp.Run(b.ctx, chromedp.Evaluate(`document.readyState === "complete"`, &result))
 	if err != nil {
-		b.Close()
 		return fmt.Errorf("浏览器状态检查失败：%w", err)
 	}
 	return nil
