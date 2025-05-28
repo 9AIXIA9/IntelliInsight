@@ -11,7 +11,8 @@ type TaskID string
 type Task struct {
 	// 任务基本信息
 	ID             TaskID     `bson:"_id"`
-	ParentID       TaskID     `bson:"parent_id,omitempty"` // 未分治任务ParentID为空
+	ParentID       TaskID     `bson:"parent_id,omitempty"`      // 未分治任务ParentID为空
+	WaitSubCount   uint64     `bson:"wait_sub_count,omitempty"` //等待的孩子数
 	Status         TaskStatus `bson:"status"`
 	PostsCollected uint32     `bson:"posts_collected"`
 	StartTime      time.Time  `bson:"start_time"`

@@ -114,6 +114,9 @@ func (tq *TaskQueue) persistTask(task *domain.Task) {
 // 处理需要分治的任务
 func (tq *TaskQueue) handleDivideTask(task *domain.Task) error {
 	logx.Debugf("任务过大，进行分治：%v", task.ID)
+
+	task.StartTime = time.Now()
+
 	subTasks := tq.DivideTask(task)
 
 	tq.mutex.Lock()
@@ -356,7 +359,6 @@ func (tq *TaskQueue) NeedToDivide(task *domain.Task) bool {
 
 // DivideTask 分治任务 - 均匀分配方式
 func (tq *TaskQueue) DivideTask(task *domain.Task) []*domain.Task {
-	//todo 看不懂
 	//  计算需要多少个子任务（向上取整，确保每个子任务大小不超过阈值）
 	n := (task.PostCount + tq.divideThreshold - 1) / tq.divideThreshold
 
@@ -379,11 +381,16 @@ func (tq *TaskQueue) DivideTask(task *domain.Task) []*domain.Task {
 
 	logx.Debugf("task:%v 分治为%v个大小为%v、%v+1的子任务", task.ID, n, baseSize, baseSize)
 
+	task.WaitSubCount = n
+
 	return subTasks
 }
 
 // UpdateParentTaskProgress 更新父任务进度
 func (tq *TaskQueue) UpdateParentTaskProgress(task *domain.Task) error {
-	// TODO: 实现更新父任务进度的逻辑
-	return nil
+	// 更新 ParentTask状态
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	return tq.repo.UpdateParentTask(ctx, task)
 }

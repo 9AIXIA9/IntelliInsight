@@ -4,9 +4,11 @@ import (
 	"context"
 	"crawler/internal/domain"
 	"errors"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 // Repository MongoDB仓库实现
@@ -56,6 +58,58 @@ func (r *Repository) SaveTask(ctx context.Context, task *domain.Task) error {
 	opts := options.Replace().SetUpsert(true)
 	_, err := r.taskCollection.ReplaceOne(ctx, filter, taskDoc, opts)
 	return err
+}
+
+func (r *Repository) UpdateParentTask(ctx context.Context, task *domain.Task) error {
+	// 检查任务有效性
+	if task == nil {
+		return errors.New("任务为空")
+	}
+
+	// 检查任务是否有父任务
+	if task.ParentID == "" {
+		return errors.New("该任务没有父任务")
+	}
+
+	// 更新父任务：减少等待子任务数并增加帖子收集数
+	filter := bson.M{"_id": task.ParentID}
+	update := bson.M{
+		"$inc": bson.M{
+			"wait_sub_count":  -1,
+			"posts_collected": task.PostsCollected,
+		},
+	}
+
+	// 获取更新后的文档以检查wait_sub_count是否为0
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var result struct {
+		WaitSubCount uint64 `bson:"wait_sub_count"`
+	}
+
+	err := r.taskCollection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&result)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("未找到父任务: %s", task.ParentID)
+		}
+		return fmt.Errorf("更新父任务进度失败: %w", err)
+	}
+
+	// 如果等待子任务数归零，则将任务标记为完成状态
+	if result.WaitSubCount == 0 {
+		completeUpdate := bson.M{
+			"$set": bson.M{
+				"status":   domain.StatusCompleted,
+				"end_time": time.Now(),
+			},
+		}
+
+		_, err = r.taskCollection.UpdateOne(ctx, filter, completeUpdate)
+		if err != nil {
+			return fmt.Errorf("标记父任务为完成状态失败: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // SavePosts 保存爬取到的帖子，返回新增帖子和评论
