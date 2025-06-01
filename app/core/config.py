@@ -11,11 +11,28 @@ class Settings(BaseSettings):
     APP_DESCRIPTION: str = "分布式爬虫与数据分析系统"
     DEBUG: bool = False
 
-    # MongoDB配置
+    # MongoDB集合配置
     MONGODB_URI: str = Field(default="mongodb://localhost:27017")
-    MONGODB_DATABASE: str = Field(default="crawler")
-    MONGODB_POST_COLLECTION: str = Field(default="posts")
-    MONGODB_TASK_COLLECTION: str = Field(default="tasks")
+    MONGODB_DATABASE: str = Field(default="crawler_db")
+    MONGODB_POST_COLLECTION: str = Field(default="crawler_posts")
+    MONGODB_TASK_COLLECTION: str = Field(default="crawler_tasks")
+    MONGODB_COMMENT_COLLECTION: str = Field(default="crawler_comments")
+
+    # 分页配置
+    DEFAULT_PAGE_SIZE: int = Field(default=20)
+    MAX_PAGE_SIZE: int = Field(default=100)
+
+    # 查询配置
+    SEARCH_OPTIONS: str = Field(default="i")  # 不区分大小写
+
+    # 排序配置
+    POST_SORT_FIELD: str = Field(default="time")
+    POST_SORT_ORDER: int = Field(default=-1)  # 降序
+    COMMENT_SORT_FIELD: str = Field(default="time")
+    COMMENT_SORT_ORDER: int = Field(default=-1)  # 降序
+
+    # 评论配置
+    COMMENTS_PER_POST: int = Field(default=20)
 
     # Consul配置
     CONSUL_HOST: str = Field(default="localhost")

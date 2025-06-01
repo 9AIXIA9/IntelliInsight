@@ -13,7 +13,7 @@ type Post struct {
 	Time     time.Time `bson:"time"`
 	Location string    `bson:"location"`
 	Link     string    `bson:"link"`
-	Content  string    `bson:"content"`
+	Content  string    `bson:"-"`
 	Tags     []string  `bson:"tags"`
 
 	LikeCount    uint64 `bson:"like_count"`

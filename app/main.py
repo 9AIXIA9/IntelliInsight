@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import crawler
+from app.api.routes import post
+from app.api.routes import task
 from app.core.config import get_settings
 from app.core.events import startup_event, shutdown_event
 
@@ -16,6 +18,7 @@ logging.basicConfig(
 
 settings = get_settings()
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动事件
@@ -23,6 +26,7 @@ async def lifespan(app: FastAPI):
     yield
     # 关闭事件
     await shutdown_event(app)
+
 
 # 创建应用
 app = FastAPI(
@@ -44,6 +48,8 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(crawler.router)
+app.include_router(task.router)
+app.include_router(post.router)
 
 if __name__ == "__main__":
     import uvicorn
