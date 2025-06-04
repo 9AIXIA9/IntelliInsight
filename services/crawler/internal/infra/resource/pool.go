@@ -33,7 +33,7 @@ type Pool struct {
 	freeDataDirMu sync.Mutex
 	freeDataDirs  []string //用于存储空闲的数据目录
 
-	strategy     domain.LoadBalancingStrategy
+	strategy     domain.LoadBalancingStrategy //domain中定义的负载均衡类型
 	roundIdx     atomic.Uint32
 	ips          []string
 	dataDirs     []string //用于存储所有读取到的数据目录

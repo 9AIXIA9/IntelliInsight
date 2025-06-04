@@ -20,5 +20,5 @@ type Divider interface {
 }
 
 type Merger interface {
-	UpdateParentTaskProgress(task *Task) error
+	UpdateParentTaskProgress(task *Task) error //更新父任务的进度
 }
